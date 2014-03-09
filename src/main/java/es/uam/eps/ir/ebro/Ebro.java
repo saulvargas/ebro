@@ -73,6 +73,7 @@ public class Ebro<V extends Vertex> {
 
     public void run() {
         while (!stop()) {
+            System.out.println(superstep());
             doSuperstep();
         }
     }

@@ -12,7 +12,6 @@ import gnu.trove.map.TIntDoubleMap;
 import gnu.trove.map.TIntIntMap;
 import gnu.trove.map.hash.TIntDoubleHashMap;
 import gnu.trove.map.hash.TIntIntHashMap;
-import gnu.trove.procedure.TIntDoubleProcedure;
 import java.io.BufferedReader;
 import java.io.FileReader;
 
@@ -23,7 +22,7 @@ import java.io.FileReader;
 public class ItemBasedKNNRecommender {
 
     public static void main(String[] args) throws Exception {
-        final Ebro<Vertex> ebro = new Ebro<>(4, 5000);
+        final Ebro<Vertex> ebro = new Ebro<>(0, 5000);
 
         TIntIntMap users = new TIntIntHashMap(Constants.DEFAULT_CAPACITY, Constants.DEFAULT_LOAD_FACTOR, -1, -1);
         TIntIntMap items = new TIntIntHashMap(Constants.DEFAULT_CAPACITY, Constants.DEFAULT_LOAD_FACTOR, -1, -1);
@@ -41,36 +40,41 @@ public class ItemBasedKNNRecommender {
                 if (!items.containsKey(i)) {
                     items.put(i, ebro.addVertex(new ItemVertex(i)));
                 }
-                
+
                 ebro.addEdge(users.get(u), items.get(i), 1.0);
                 ebro.addEdge(items.get(i), users.get(u), 1.0);
             }
         }
 
+        int i = 0;
+        for (int id : users.values()) {
+            ((UserVertex) ebro.getVertex(id)).request();
+            i++;
+            if (i > 10) {
+                break;
+            }
+        }
+//        ((UserVertex) ebro.getVertex(users.get(196))).request();
+
         ebro.run();
 
         System.out.println(ebro.superstep());
-        TIntDoubleMap recommendation = ((UserVertex) ebro.getVertex(0)).recommendation;
-        recommendation.forEachEntry(new TIntDoubleProcedure() {
-
-            @Override
-            public boolean execute(int i, double s) {
-                System.out.println(i + "\t" + s);
-                return true;
-            }
-        });
     }
 
     public static class ItemVertex extends Vertex<int[]> {
 
-        private final int i_id;
+        protected final int i_ml;
 
-        public ItemVertex(int itemID) {
-            this.i_id = itemID;
+        public ItemVertex(int mlID) {
+            this.i_ml = mlID;
         }
 
         @Override
         protected void compute(Iterable<int[]> messages) {
+            itemCompute(messages);
+        }
+
+        private void itemCompute(Iterable<int[]> messages) {
             for (int[] m : messages) {
                 switch (m[0]) {
                     case 0:
@@ -78,7 +82,7 @@ public class ItemBasedKNNRecommender {
                         for (int i = 0; i < edgeDestList.size(); i++) {
                             int v_id = edgeDestList.get(i);
                             if (u_id != v_id) {
-                                sendMessage(v_id, new int[]{1, u_id, i_id});
+                                sendMessage(v_id, new int[]{1, u_id, id});
                             }
                         }
                         break;
@@ -86,54 +90,73 @@ public class ItemBasedKNNRecommender {
             }
             voteToHalt();
         }
-
     }
 
     public static class UserVertex extends Vertex<int[]> {
 
-        private final int u_id;
+        protected final int u_ml;
         private boolean requested;
+        private boolean pending;
         private final TIntDoubleMap recommendation;
 
         public UserVertex(int userID) {
-            this.u_id = userID;
-            this.requested = false;
+            this.u_ml = userID;
             this.recommendation = new TIntDoubleHashMap(Constants.DEFAULT_CAPACITY, Constants.DEFAULT_LOAD_FACTOR, -1, 0.0);
+            this.requested = false;
+            this.pending = false;
+        }
+
+        public void request() {
+            requested = true;
+            pending = false;
         }
 
         @Override
         protected void compute(Iterable<int[]> messages) {
-            if (!requested) {
-                for (int i = 0; i < edgeDestList.size(); i++) {
-                    sendMessage(edgeDestList.get(i), new int[]{0, u_id});
-                }
-
-                requested = true;
+            if (requested && !pending) {
+                doRequest();
+                pending = true;
             }
 
             for (int[] m : messages) {
                 switch (m[0]) {
                     case 1:
-                        int v_id = m[1];
-                        int i_id = m[2];
-                        for (int i = 0; i < edgeDestList.size(); i++) {
-                            int j_id = edgeDestList.get(i);
-                            if (i_id != j_id) {
-                                sendMessage(v_id, new int[]{2, j_id});
-                            }
-                        }
+                        doCase1(m);
                         break;
                     case 2:
-                        int j_id = m[1];
-                        recommendation.adjustOrPutValue(j_id, 1, 1);
+                        doCase2(m);
                         break;
                 }
             }
             voteToHalt();
         }
 
+        private void doRequest() {
+            for (int i = 0; i < edgeDestList.size(); i++) {
+                sendMessage(edgeDestList.get(i), new int[]{0, id});
+            }
+        }
+
+        private void doCase1(int[] m) {
+            int v_id = m[1];
+            int i_id = m[2];
+            for (int i = 0; i < edgeDestList.size(); i++) {
+                int j_id = edgeDestList.get(i);
+                if (i_id != j_id) {
+                    sendMessage(v_id, new int[]{2, j_id});
+                }
+            }
+        }
+
+        private void doCase2(int[] m) {
+            if (requested) {
+                int j_id = m[1];
+                recommendation.adjustOrPutValue(j_id, 1, 1);
+            }
+        }
+
     }
-    
+
 //        int u0 = ebro.addVertex(new UserVertex(0));
 //        int u1 = ebro.addVertex(new UserVertex(1));
 //        int u2 = ebro.addVertex(new UserVertex(2));
@@ -166,5 +189,4 @@ public class ItemBasedKNNRecommender {
 //        ebro.addEdge(i4, u2, 1.0);
 //        ebro.addEdge(u3, i5, 1.0);
 //        ebro.addEdge(i5, u3, 1.0);
-
 }
