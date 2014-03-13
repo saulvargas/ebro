@@ -33,33 +33,36 @@ public class Ebro<V extends Vertex> {
     private final TIntByteMap votes;
     private final ExecutorService threadPool;
     private int n;
+    private final boolean directed;
+    private final boolean weighted;
 
-    public Ebro(int nthreads, int nvertices) {
+    public Ebro(int nthreads, int nvertices, boolean directed, boolean weighted) {
         this.superstep = 0;
         this.vertices = new TIntObjectHashMap<>(nvertices, Constants.DEFAULT_LOAD_FACTOR, -1);
         this.currentMessages = new TIntObjectHashMap<>(nvertices, Constants.DEFAULT_LOAD_FACTOR, -1);
         this.futureMessages = new TIntObjectHashMap<>(nvertices, Constants.DEFAULT_LOAD_FACTOR, -1);
         this.votes = new TIntByteHashMap(nvertices, Constants.DEFAULT_LOAD_FACTOR, -1, HALT);
+        this.directed = directed;
+        this.weighted = weighted;
 
         if (nthreads > 0) {
             this.threadPool = Executors.newFixedThreadPool(nthreads, new CustomThreadFactory());
         } else {
             this.threadPool = null;
         }
-        
+
         n = 0;
     }
 
     public int addVertex(V v) {
-        v.id = n;
-        v.ebro = this;
+        v.configure(n, this, weighted);
         vertices.put(v.id, v);
         currentMessages.put(v.id, Collections.synchronizedList(new ArrayList()));
         futureMessages.put(v.id, Collections.synchronizedList(new ArrayList()));
         votes.put(v.id, NOHALT);
 
         n++;
-        
+
         return v.id;
     }
 
@@ -67,17 +70,33 @@ public class Ebro<V extends Vertex> {
         return vertices.get(id);
     }
 
+    public void addEdge(int from, int to) {
+        addEdge(from, to, 1.0);
+    }
+
     public void addEdge(int from, int to, double w) {
         vertices.get(from).addEdge(to, w);
+        if (!directed) {
+            vertices.get(to).addEdge(from, w);
+        }
     }
 
     public void run() {
         while (!stop()) {
-            System.out.println(superstep());
+            System.out.println(superstep() + "\t" + numMessages());
             doSuperstep();
         }
     }
 
+    private int numMessages() {
+        int n = 0;
+        for (List m : currentMessages.valueCollection()) {
+            n += m.size();
+        }
+        
+        return n;
+    }
+    
     private boolean hasMessages() {
         for (List m : currentMessages.valueCollection()) {
             if (!m.isEmpty()) {
@@ -185,18 +204,29 @@ public class Ebro<V extends Vertex> {
         protected int id;
         protected Ebro<Vertex<M>> ebro;
         protected final TIntList edgeDestList;
-        protected final TDoubleList edgeWeightList;
+        protected TDoubleList edgeWeightList;
 
         public Vertex() {
             this.edgeDestList = new TIntArrayList();
-            this.edgeWeightList = new TDoubleArrayList();
+        }
+
+        protected void configure(int id, Ebro<Vertex<M>> ebro, boolean weighted) {
+            this.id = id;
+            this.ebro = ebro;
+            if (weighted) {
+                edgeWeightList = new TDoubleArrayList();
+            } else {
+                edgeWeightList = null;
+            }
         }
 
         protected abstract void compute(Iterable<M> messages);
 
         protected final void addEdge(int dst, double weight) {
             edgeDestList.add(dst);
-            edgeWeightList.add(weight);
+            if (edgeWeightList != null) {
+                edgeWeightList.add(weight);
+            }
         }
 
         protected final int superstep() {

@@ -16,7 +16,7 @@ public class MaxValue {
         int N = 500000;
         double p = 0.0001;
 
-        Ebro<MaxValueVertex> ebro = new Ebro<>(6, N);
+        Ebro<MaxValueVertex> ebro = new Ebro<>(6, N, true, false);
 
         for (int i = 0; i < N; i++) {
             ebro.addVertex(new MaxValueVertex((double) i));
@@ -38,7 +38,7 @@ public class MaxValue {
             }
             edges[i].add(j);
 
-            ebro.addEdge(i, j, 1.0);
+            ebro.addEdge(i, j);
         }
 
         ebro.run();

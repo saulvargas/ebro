@@ -14,7 +14,7 @@ public class SingleSourceShortestPath {
         int N = 500000;
         double p = 0.0001;
 
-        Ebro<SSSPVertex> ebro = new Ebro<>(6, N);
+        Ebro<SSSPVertex> ebro = new Ebro<>(6, N, true, true);
 
         for (int i = 0; i < N; i++) {
             ebro.addVertex(new SSSPVertex(0, Double.POSITIVE_INFINITY));
