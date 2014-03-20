@@ -8,6 +8,7 @@ package es.uam.eps.ir.ebro.examples;
 import es.uam.eps.ir.ebro.Ebro;
 import es.uam.eps.ir.ebro.Ebro.Vertex;
 import es.uam.eps.ir.ebro.examples.rs.ItemBasedKNNRVF;
+import es.uam.eps.ir.ebro.examples.rs.PLSARVF;
 import es.uam.eps.ir.ebro.examples.rs.RecommendationVerticesFactory;
 import es.uam.eps.ir.ebro.examples.rs.RecommendationVerticesFactory.UserVertex;
 import gnu.trove.impl.Constants;
@@ -22,16 +23,19 @@ import java.io.FileWriter;
  *
  * @author saul
  */
-public class ItemBasedKNNRecommender {
+public class Recommendations {
 
     public static void main(String[] args) throws Exception {
         int nthreads = 6;
-        String path = "u.data";
+        String path = "/home/saul/ceri2014/ml1M_fold1/train.data";
+//        String path = "u.data";
 
         final Ebro<Vertex> ebro = new Ebro<>(nthreads, 5000, false, false);
         
         try (BufferedWriter writer = new BufferedWriter(new FileWriter("rec"))) {
-            RecommendationVerticesFactory<String, String, Object[]> rvf = new ItemBasedKNNRVF<>(writer);
+//            RecommendationVerticesFactory<String, String, Object[]> rvf = new ItemBasedKNNRVF<>(writer, 100, 5000);
+            RecommendationVerticesFactory<String, String, Object[]> rvf = new PLSARVF<>(50, 200, 100, writer);
+            
             TObjectIntMap<String> users = new TObjectIntHashMap<>(Constants.DEFAULT_CAPACITY, Constants.DEFAULT_LOAD_FACTOR, -1);
             TObjectIntMap<String> items = new TObjectIntHashMap<>(Constants.DEFAULT_CAPACITY, Constants.DEFAULT_LOAD_FACTOR, -1);
 
@@ -55,7 +59,7 @@ public class ItemBasedKNNRecommender {
             items.clear();
 
             for (int id : users.values()) {
-                ((UserVertex) ebro.getVertex(id)).request();
+                ((UserVertex) ebro.getVertex(id)).activate();
             }
 
             ebro.run();

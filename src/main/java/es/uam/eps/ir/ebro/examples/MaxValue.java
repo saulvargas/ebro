@@ -77,7 +77,7 @@ public class MaxValue {
                     value = maxValue;
                 }
                 for (int i = 0; i < edgeDestList.size(); i++) {
-                    sendMessage(edgeDestList.get(i), value);
+                    sendMessage(edgeDestList.getQuick(i), value);
                 }
             } else {
                 voteToHalt();

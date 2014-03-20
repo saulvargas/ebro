@@ -32,7 +32,7 @@ public class Ebro<V extends Vertex> {
     private TIntObjectMap<List> futureMessages;
     private final TIntByteMap votes;
     private final ExecutorService threadPool;
-    private int n;
+    private int vertexCount;
     private final boolean directed;
     private final boolean weighted;
 
@@ -51,17 +51,17 @@ public class Ebro<V extends Vertex> {
             this.threadPool = null;
         }
 
-        n = 0;
+        vertexCount = 0;
     }
 
     public int addVertex(V v) {
-        v.configure(n, this, weighted);
+        v.configure(vertexCount, this, weighted);
         vertices.put(v.id, v);
         currentMessages.put(v.id, Collections.synchronizedList(new ArrayList()));
         futureMessages.put(v.id, Collections.synchronizedList(new ArrayList()));
         votes.put(v.id, NOHALT);
 
-        n++;
+        vertexCount++;
 
         return v.id;
     }
@@ -203,8 +203,8 @@ public class Ebro<V extends Vertex> {
 
         protected int id;
         protected Ebro<Vertex<M>> ebro;
-        protected final TIntList edgeDestList;
-        protected TDoubleList edgeWeightList;
+        protected final TIntArrayList edgeDestList;
+        protected TDoubleArrayList edgeWeightList;
 
         public Vertex() {
             this.edgeDestList = new TIntArrayList();

@@ -7,16 +7,14 @@ package es.uam.eps.ir.ebro.examples.rs;
 
 import es.uam.eps.ir.utils.dstructs.TIntDoubleTopN;
 import gnu.trove.impl.Constants;
-import gnu.trove.list.TIntList;
-import gnu.trove.list.linked.TIntLinkedList;
+import gnu.trove.list.array.TIntArrayList;
 import gnu.trove.map.TIntDoubleMap;
+import gnu.trove.map.TIntIntMap;
 import gnu.trove.map.hash.TIntDoubleHashMap;
-import gnu.trove.procedure.TIntDoubleProcedure;
+import gnu.trove.map.hash.TIntIntHashMap;
+import gnu.trove.procedure.TIntIntProcedure;
 import gnu.trove.procedure.TIntProcedure;
 import java.io.BufferedWriter;
-import java.io.IOException;
-import java.util.logging.Level;
-import java.util.logging.Logger;
 
 /**
  *
@@ -24,94 +22,74 @@ import java.util.logging.Logger;
  */
 public class ItemBasedKNNRVF<U, I> extends RecommendationVerticesFactory<U, I, Object[]> {
 
-    private final BufferedWriter writer;
+    private final int N;
 
-    public ItemBasedKNNRVF(BufferedWriter writer) {
-        this.writer = writer;
+    private enum MessageType {
+
+        USER_REC_REQUEST, // (u)        SR
+        ITEM_SIM_BEGIN, // (i)          SR
+        USER_SIM_FORWARD, // ([i, n])     SR
+        ITEM_REC_RESPONSE,  // ([i, s]) SR
+    }
+
+    public ItemBasedKNNRVF(BufferedWriter writer, int cutoff, int N) {
+        super(cutoff, writer);
+        this.N = N;
     }
 
     @Override
     public UserVertex<U, Object[]> getUserVertex(U u) {
         return new UserVertex<U, Object[]>(u) {
 
-            private boolean ready = false;
             private boolean waiting = false;
-            private TIntDoubleMap auxMap = null;
 
             @Override
             protected void compute(Iterable<Object[]> messages) {
-                if (requested && !ready && !waiting) {
+                if (active && !waiting) {
                     for (int i = 0; i < edgeDestList.size(); i++) {
-                        int i_id = edgeDestList.get(i);
-                        sendMessage(i_id, new Object[]{0, id});
+                        int i_id = edgeDestList.getQuick(i);
+                        sendMessage(i_id, new Object[]{MessageType.USER_REC_REQUEST, id});
                     }
                     waiting = true;
                 }
-                if (!requested) {
-                    ready = true;
-                }
 
+                TIntDoubleMap scoresMap = new TIntDoubleHashMap(Constants.DEFAULT_CAPACITY, Constants.DEFAULT_LOAD_FACTOR, -1, 0.0);
+                TIntArrayList edges = new TIntArrayList();
+                TIntArrayList sizes = new TIntArrayList();
                 for (Object[] m : messages) {
-                    switch ((Integer) m[0]) {
-                        case 1:
+                    switch ((MessageType) m[0]) {
+                        case ITEM_SIM_BEGIN:
                             int i_id = (Integer) m[1];
-                            sendMessage(i_id, new Object[]{2, edgeDestList});
+                            int ni = (Integer) m[2];
+                            edges.add(i_id);
+                            sizes.add(ni);
                             break;
-                        case 3:
-                            TIntDoubleMap sim = (TIntDoubleMap) m[1];
+                        case ITEM_REC_RESPONSE:
+                            TIntDoubleTopN sim = (TIntDoubleTopN) m[1];
 
-                            if (auxMap == null) {
-                                auxMap = new TIntDoubleHashMap();
+                            for (int i = 0; i < sim.size(); i++) {
+                                scoresMap.adjustOrPutValue(sim.getKeyAt(i), sim.getValueAt(i), sim.getValueAt(i));
                             }
-
-                            sim.forEachEntry(new TIntDoubleProcedure() {
-
-                                @Override
-                                public boolean execute(int j_id, double sim) {
-                                    auxMap.adjustOrPutValue(j_id, sim, sim);
-                                    return true;
-                                }
-                            });
-                            ready = true;
+                            waiting = false;
                             break;
                     }
                 }
 
-                if (ready && requested) {
+                if (!edges.isEmpty()) {
                     for (int i = 0; i < edgeDestList.size(); i++) {
-                        int i_id = edgeDestList.get(i);
-                        auxMap.remove(i_id);
-                    }
-
-                    final TIntDoubleTopN topN = new TIntDoubleTopN(100);
-                    auxMap.forEachEntry(new TIntDoubleProcedure() {
-
-                        @Override
-                        public boolean execute(int a, double b) {
-                            topN.add(a, b);
-                            return true;
-                        }
-                    });
-                    auxMap.clear();
-                    auxMap = null;
-
-                    topN.sort();
-
-                    synchronized (writer) {
-                        try {
-                            for (int i = 0; i < topN.size(); i++) {
-                                String i_id = ((ItemVertex<String, Object[]>) ebro.getVertex(topN.getKeyAt(i))).i_ml;
-                                writer.write(u_ml + "\tQ0\t" + i_id + "\t" + (i + 1) + "\t" + topN.getValueAt(i) + "\tr");
-                                writer.newLine();
-                            }
-                            writer.flush();
-                        } catch (IOException ex) {
-                            Logger.getLogger(ItemBasedKNNRVF.class.getName()).log(Level.SEVERE, null, ex);
-                        }
+                        int j_id = edgeDestList.getQuick(i);
+                        sendMessage(j_id, new Object[]{MessageType.USER_SIM_FORWARD, edges, sizes});
                     }
                 }
 
-                if (ready) {
+                if (active && !waiting) {
+                    printResults(scoresMap);
+                    scoresMap.clear();
+
+                    active = false;
+                }
+
+                if (!active) {
                     voteToHalt();
                 }
             }
@@ -123,56 +101,73 @@ public class ItemBasedKNNRVF<U, I> extends RecommendationVerticesFactory<U, I, O
     public ItemVertex<I, Object[]> getItemVertex(I i) {
         return new ItemVertex<I, Object[]>(i) {
 
-            private final TIntDoubleMap sim = new TIntDoubleHashMap(Constants.DEFAULT_CAPACITY, Constants.DEFAULT_LOAD_FACTOR, -1, 0.0);
-            private boolean ready = false;
+            private boolean active = true;
             private boolean waiting = false;
-            private final TIntList users = new TIntLinkedList();
+            private final TIntArrayList users = new TIntArrayList();
 
             @Override
             protected void compute(Iterable<Object[]> messages) {
-                if (!ready && !waiting) {
+                if (active && !waiting) {
                     for (int i = 0; i < edgeDestList.size(); i++) {
-                        int v_id = edgeDestList.get(i);
-                        sendMessage(v_id, new Object[]{1, id});
+                        int v_id = edgeDestList.getQuick(i);
+                        sendMessage(v_id, new Object[]{MessageType.ITEM_SIM_BEGIN, id, edgeDestList.size()});
                     }
                     waiting = true;
                 }
 
+                final TIntIntMap intersection = new TIntIntHashMap(Constants.DEFAULT_CAPACITY, Constants.DEFAULT_LOAD_FACTOR, -1, 0);
+                final TIntIntMap count = new TIntIntHashMap(Constants.DEFAULT_CAPACITY, Constants.DEFAULT_LOAD_FACTOR, -1, 0);
                 for (Object[] m : messages) {
-                    switch ((Integer) m[0]) {
-                        case 0:
+                    switch ((MessageType) m[0]) {
+                        case USER_REC_REQUEST:
                             int u_id = (Integer) m[1];
                             users.add(u_id);
                             break;
-                        case 2:
-                            TIntList list = (TIntList) m[1];
-                            list.forEach(new TIntProcedure() {
-
-                                @Override
-                                public boolean execute(int j_id) {
-                                    sim.adjustOrPutValue(j_id, 1, 1);
-                                    return true;
+                        case USER_SIM_FORWARD:
+                            TIntArrayList edges = (TIntArrayList) m[1];
+                            TIntArrayList sizes = (TIntArrayList) m[2];
+                            for (int i = 0; i < edges.size(); i++) {
+                                int j_id = edges.getQuick(i);
+                                int nj = sizes.getQuick(i);
+                                if (j_id != id) {
+                                    intersection.adjustOrPutValue(j_id, 1, 1);
+                                    count.put(j_id, nj);
                                 }
-                            });
+                            }
+
                             waiting = false;
-                            ready = true;
                             break;
                     }
                 }
 
-                if (ready) {
+                if (active && !waiting) {
+                    final TIntDoubleTopN sim = new TIntDoubleTopN(N);
+
+                    final double ni = edgeDestList.size();
+                    intersection.forEachEntry(new TIntIntProcedure() {
+
+                        @Override
+                        public boolean execute(int j_id, int i) {
+                            sim.add(j_id, i / (double) (ni + count.get(j_id) - i));
+                            return true;
+                        }
+                    });
+
                     users.forEach(new TIntProcedure() {
 
                         @Override
                         public boolean execute(int u_id) {
-                            sendMessage(u_id, new Object[]{3, sim});
+                            sendMessage(u_id, new Object[]{MessageType.ITEM_REC_RESPONSE, sim});
                             return true;
                         }
                     });
+
                     users.clear();
-                    voteToHalt();
+
+                    active = false;
                 }
 
+                voteToHalt();
             }
         };
     }

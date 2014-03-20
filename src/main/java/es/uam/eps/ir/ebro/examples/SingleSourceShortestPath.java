@@ -78,7 +78,7 @@ public class SingleSourceShortestPath {
             if (minDist < dist) {
                 dist = minDist;
                 for (int i = 0; i < edgeDestList.size(); i++) {
-                    sendMessage(edgeDestList.get(i), dist + edgeWeightList.get(i));
+                    sendMessage(edgeDestList.getQuick(i), dist + edgeWeightList.getQuick(i));
                 }
             }
             voteToHalt();
