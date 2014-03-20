@@ -2,8 +2,6 @@ package es.uam.eps.ir.ebro;
 
 import es.uam.eps.ir.ebro.Ebro.Vertex;
 import gnu.trove.impl.Constants;
-import gnu.trove.list.TDoubleList;
-import gnu.trove.list.TIntList;
 import gnu.trove.list.array.TDoubleArrayList;
 import gnu.trove.list.array.TIntArrayList;
 import gnu.trove.map.TIntByteMap;
@@ -22,23 +20,26 @@ import java.util.concurrent.ThreadFactory;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
-public class Ebro<V extends Vertex> {
+public class Ebro {
 
     private static final byte NOHALT = (byte) 0;
     private static final byte HALT = (byte) 1;
     private int superstep;
-    private final TIntObjectMap<V> vertices;
+    private final TIntObjectMap<Vertex> vertices;
+    private final TIntObjectMap<Aggregator> aggregators;
     private TIntObjectMap<List> currentMessages;
     private TIntObjectMap<List> futureMessages;
     private final TIntByteMap votes;
     private final ExecutorService threadPool;
     private int vertexCount;
+    private int aggregatorCount;
     private final boolean directed;
     private final boolean weighted;
 
     public Ebro(int nthreads, int nvertices, boolean directed, boolean weighted) {
         this.superstep = 0;
         this.vertices = new TIntObjectHashMap<>(nvertices, Constants.DEFAULT_LOAD_FACTOR, -1);
+        this.aggregators = new TIntObjectHashMap<>();
         this.currentMessages = new TIntObjectHashMap<>(nvertices, Constants.DEFAULT_LOAD_FACTOR, -1);
         this.futureMessages = new TIntObjectHashMap<>(nvertices, Constants.DEFAULT_LOAD_FACTOR, -1);
         this.votes = new TIntByteHashMap(nvertices, Constants.DEFAULT_LOAD_FACTOR, -1, HALT);
@@ -52,9 +53,10 @@ public class Ebro<V extends Vertex> {
         }
 
         vertexCount = 0;
+        aggregatorCount = 0;
     }
 
-    public int addVertex(V v) {
+    public int addVertex(Vertex v) {
         v.configure(vertexCount, this, weighted);
         vertices.put(v.id, v);
         currentMessages.put(v.id, Collections.synchronizedList(new ArrayList()));
@@ -65,8 +67,17 @@ public class Ebro<V extends Vertex> {
 
         return v.id;
     }
+    
+    public int addAgregator(Aggregator a) {
+        a.configure(aggregatorCount, this);
+        aggregators.put(aggregatorCount, a);
+        
+        aggregatorCount++;
+        
+        return a.id;
+    }
 
-    public V getVertex(int id) {
+    public Vertex getVertex(int id) {
         return vertices.get(id);
     }
 
@@ -166,6 +177,9 @@ public class Ebro<V extends Vertex> {
         }
 
         tasks.clear();
+        for (Aggregator a : aggregators.valueCollection()) {
+            a.nextStep();
+        }
 
         superstep++;
         TIntObjectMap<List> aux;
@@ -202,7 +216,7 @@ public class Ebro<V extends Vertex> {
     public static abstract class Vertex<M> {
 
         protected int id;
-        protected Ebro<Vertex<M>> ebro;
+        protected Ebro ebro;
         protected final TIntArrayList edgeDestList;
         protected TDoubleArrayList edgeWeightList;
 
@@ -210,7 +224,7 @@ public class Ebro<V extends Vertex> {
             this.edgeDestList = new TIntArrayList();
         }
 
-        protected void configure(int id, Ebro<Vertex<M>> ebro, boolean weighted) {
+        private void configure(int id, Ebro ebro, boolean weighted) {
             this.id = id;
             this.ebro = ebro;
             if (weighted) {
@@ -220,14 +234,14 @@ public class Ebro<V extends Vertex> {
             }
         }
 
-        protected abstract void compute(Iterable<M> messages);
-
-        protected final void addEdge(int dst, double weight) {
+        private void addEdge(int dst, double weight) {
             edgeDestList.add(dst);
             if (edgeWeightList != null) {
                 edgeWeightList.add(weight);
             }
         }
+
+        protected abstract void compute(Iterable<M> messages);
 
         protected final int superstep() {
             return ebro.superstep();
@@ -241,5 +255,39 @@ public class Ebro<V extends Vertex> {
             ebro.sendMessage(dst, message);
         }
 
+    }
+
+    public static abstract class Aggregator<T> {
+
+        protected int id;
+        protected Ebro ebro;
+        protected T t0;
+        protected T t1;
+        
+        public Aggregator() {
+        }
+        
+        private void configure(int id, Ebro ebro) {
+            this.id = id;
+            this.ebro = ebro;
+            this.t1 = init();
+        }
+        
+        private void nextStep() {
+            t0 = t1;
+            t1 = init();
+        }
+        
+        protected abstract T init();
+        
+        protected abstract T aggregate(T t1, T t);
+        
+        public synchronized void aggregate(T t) {
+            t1 = aggregate(t1, t);
+        }
+        
+        public T getValue() {
+            return t0;
+        }
     }
 }

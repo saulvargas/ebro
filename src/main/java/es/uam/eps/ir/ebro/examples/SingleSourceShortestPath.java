@@ -14,7 +14,7 @@ public class SingleSourceShortestPath {
         int N = 500000;
         double p = 0.0001;
 
-        Ebro<SSSPVertex> ebro = new Ebro<>(6, N, true, true);
+        Ebro ebro = new Ebro(6, N, true, true);
 
         for (int i = 0; i < N; i++) {
             ebro.addVertex(new SSSPVertex(0, Double.POSITIVE_INFINITY));
@@ -44,7 +44,7 @@ public class SingleSourceShortestPath {
         double avgDist = 0.0;
         int n = 0;
         for (int i = 0; i < N; i++) {
-            SSSPVertex v = ebro.getVertex(i);
+            SSSPVertex v = (SSSPVertex) ebro.getVertex(i);
             if (!Double.isInfinite(v.dist)) {
                 avgDist += v.dist;
                 n++;
@@ -69,7 +69,7 @@ public class SingleSourceShortestPath {
         }
 
         @Override
-        public void compute(Iterable<Double> messages) {
+        protected void compute(Iterable<Double> messages) {
             double minDist = source == id ? 0.0 : Double.POSITIVE_INFINITY;
             for (double otherDist : messages) {
                 minDist = Math.min(minDist, otherDist);

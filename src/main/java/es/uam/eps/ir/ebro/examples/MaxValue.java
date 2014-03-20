@@ -16,7 +16,7 @@ public class MaxValue {
         int N = 500000;
         double p = 0.0001;
 
-        Ebro<MaxValueVertex> ebro = new Ebro<>(6, N, true, false);
+        Ebro ebro = new Ebro(6, N, true, false);
 
         for (int i = 0; i < N; i++) {
             ebro.addVertex(new MaxValueVertex((double) i));
@@ -45,7 +45,7 @@ public class MaxValue {
 
         TDoubleSet set = new TDoubleHashSet();
         for (int i = 0; i < N; i++) {
-            MaxValueVertex v = ebro.getVertex(i);
+            MaxValueVertex v = (MaxValueVertex) ebro.getVertex(i);
             set.add(v.value);
         }
 
@@ -64,7 +64,7 @@ public class MaxValue {
         }
 
         @Override
-        public void compute(Iterable<Double> messages) {
+        protected void compute(Iterable<Double> messages) {
             double maxValue = Double.NEGATIVE_INFINITY;
             for (double v : messages) {
                 if (v > maxValue) {

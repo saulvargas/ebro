@@ -5,6 +5,7 @@
  */
 package es.uam.eps.ir.ebro.examples.rs;
 
+import es.uam.eps.ir.ebro.Ebro;
 import es.uam.eps.ir.utils.dstructs.TIntDoubleTopN;
 import gnu.trove.impl.Constants;
 import gnu.trove.list.array.TIntArrayList;
@@ -32,13 +33,13 @@ public class ItemBasedKNNRVF<U, I> extends RecommendationVerticesFactory<U, I, O
         ITEM_REC_RESPONSE,  // ([i, s]) SR
     }
 
-    public ItemBasedKNNRVF(BufferedWriter writer, int cutoff, int N) {
-        super(cutoff, writer);
+    public ItemBasedKNNRVF(Ebro ebro, BufferedWriter writer, int cutoff, int N) {
+        super(ebro, cutoff, writer);
         this.N = N;
     }
 
     @Override
-    public UserVertex<U, Object[]> getUserVertex(U u) {
+    public UserVertex<U, Object[]> createUserVertex(U u) {
         return new UserVertex<U, Object[]>(u) {
 
             private boolean waiting = false;
@@ -98,7 +99,7 @@ public class ItemBasedKNNRVF<U, I> extends RecommendationVerticesFactory<U, I, O
     }
 
     @Override
-    public ItemVertex<I, Object[]> getItemVertex(I i) {
+    public ItemVertex<I, Object[]> createItemVertex(I i) {
         return new ItemVertex<I, Object[]>(i) {
 
             private boolean active = true;

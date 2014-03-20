@@ -6,14 +6,8 @@
 package es.uam.eps.ir.ebro.examples;
 
 import es.uam.eps.ir.ebro.Ebro;
-import es.uam.eps.ir.ebro.Ebro.Vertex;
-import es.uam.eps.ir.ebro.examples.rs.ItemBasedKNNRVF;
 import es.uam.eps.ir.ebro.examples.rs.PLSARVF;
 import es.uam.eps.ir.ebro.examples.rs.RecommendationVerticesFactory;
-import es.uam.eps.ir.ebro.examples.rs.RecommendationVerticesFactory.UserVertex;
-import gnu.trove.impl.Constants;
-import gnu.trove.map.TObjectIntMap;
-import gnu.trove.map.hash.TObjectIntHashMap;
 import java.io.BufferedReader;
 import java.io.BufferedWriter;
 import java.io.FileReader;
@@ -30,14 +24,11 @@ public class Recommendations {
         String path = "/home/saul/ceri2014/ml1M_fold1/train.data";
 //        String path = "u.data";
 
-        final Ebro<Vertex> ebro = new Ebro<>(nthreads, 5000, false, false);
-        
+        final Ebro ebro = new Ebro(nthreads, 5000, false, false);
+
         try (BufferedWriter writer = new BufferedWriter(new FileWriter("rec"))) {
-//            RecommendationVerticesFactory<String, String, Object[]> rvf = new ItemBasedKNNRVF<>(writer, 100, 5000);
-            RecommendationVerticesFactory<String, String, Object[]> rvf = new PLSARVF<>(50, 200, 100, writer);
-            
-            TObjectIntMap<String> users = new TObjectIntHashMap<>(Constants.DEFAULT_CAPACITY, Constants.DEFAULT_LOAD_FACTOR, -1);
-            TObjectIntMap<String> items = new TObjectIntHashMap<>(Constants.DEFAULT_CAPACITY, Constants.DEFAULT_LOAD_FACTOR, -1);
+//            RecommendationVerticesFactory<String, String, Object[]> rvf = new ItemBasedKNNRVF<>(ebro, writer, 100, 50);
+            RecommendationVerticesFactory<String, String, Object[]> rvf = new PLSARVF<>(ebro, 50, 200, 100, writer);
 
             try (BufferedReader reader = new BufferedReader(new FileReader(path))) {
                 String line;
@@ -46,20 +37,15 @@ public class Recommendations {
                     String u = tokens[0];
                     String i = tokens[1];
 
-                    if (!users.containsKey(u)) {
-                        users.put(u, ebro.addVertex(rvf.getUserVertex(u)));
-                    }
-                    if (!items.containsKey(i)) {
-                        items.put(i, ebro.addVertex(rvf.getItemVertex(i)));
-                    }
+                    rvf.addUser(u);
+                    rvf.addItem(i);
 
-                    ebro.addEdge(users.get(u), items.get(i));
+                    rvf.addEdge(u, i);
                 }
             }
-            items.clear();
 
-            for (int id : users.values()) {
-                ((UserVertex) ebro.getVertex(id)).activate();
+            for (String user : rvf.getUsers()) {
+                rvf.getUserVertex(user).activate();
             }
 
             ebro.run();

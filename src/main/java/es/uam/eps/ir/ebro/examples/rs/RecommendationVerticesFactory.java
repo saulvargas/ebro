@@ -6,11 +6,16 @@
 package es.uam.eps.ir.ebro.examples.rs;
 
 import es.uam.eps.ir.ebro.Ebro;
+import es.uam.eps.ir.ebro.Ebro.Aggregator;
 import es.uam.eps.ir.utils.dstructs.TIntDoubleTopN;
+import gnu.trove.impl.Constants;
 import gnu.trove.map.TIntDoubleMap;
+import gnu.trove.map.TObjectIntMap;
+import gnu.trove.map.hash.TObjectIntHashMap;
 import gnu.trove.procedure.TIntDoubleProcedure;
 import java.io.BufferedWriter;
 import java.io.IOException;
+import java.util.Set;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
@@ -22,15 +27,55 @@ public abstract class RecommendationVerticesFactory<U, I, M> {
 
     private final int cutoff;
     private final BufferedWriter writer;
+    private final Ebro ebro;
+    private final TObjectIntMap<U> users = new TObjectIntHashMap<>(Constants.DEFAULT_CAPACITY, Constants.DEFAULT_LOAD_FACTOR, -1);
+    private final TObjectIntMap<I> items = new TObjectIntHashMap<>(Constants.DEFAULT_CAPACITY, Constants.DEFAULT_LOAD_FACTOR, -1);
 
-    public RecommendationVerticesFactory(int cutoff, BufferedWriter writer) {
+    public RecommendationVerticesFactory(Ebro ebro, int cutoff, BufferedWriter writer) {
+        this.ebro = ebro;
         this.cutoff = cutoff;
         this.writer = writer;
     }
 
-    public abstract UserVertex<U, M> getUserVertex(U u);
+    public void addUser(U u) {
+        if (!users.containsKey(u)) {
+            users.put(u, ebro.addVertex(createUserVertex(u)));
+        }
+    }
 
-    public abstract ItemVertex<I, M> getItemVertex(I i);
+    public void addItem(I i) {
+        if (!items.containsKey(i)) {
+            items.put(i, ebro.addVertex(createItemVertex(i)));
+        }
+    }
+    
+    protected void addAggregator(Aggregator a) {
+        ebro.addAgregator(a);
+    }
+
+    public void addEdge(U u, I i) {
+        ebro.addEdge(users.get(u), items.get(i));
+    }
+
+    public Set<U> getUsers() {
+        return users.keySet();
+    }
+
+    public Set<I> getItems() {
+        return items.keySet();
+    }
+
+    public UserVertex<U, M> getUserVertex(U u) {
+        return (UserVertex<U, M>) ebro.getVertex(users.get(u));
+    }
+
+    public ItemVertex<I, M> getItemVertex(I i) {
+        return (ItemVertex<I, M>) ebro.getVertex(items.get(i));
+    }
+
+    public abstract UserVertex<U, M> createUserVertex(U u);
+
+    public abstract ItemVertex<I, M> createItemVertex(I i);
 
     public abstract class ItemVertex<I, M> extends Ebro.Vertex<M> {
 
@@ -55,8 +100,14 @@ public abstract class RecommendationVerticesFactory<U, I, M> {
         public void activate() {
             active = true;
         }
+        
+        public void sendMessageToAllItems(M message) {
+            for (int i_id : items.values()) {
+                sendMessage(i_id, message);
+            }
+        }
 
-        protected void printResults(TIntDoubleMap scoresMap ){
+        protected void printResults(TIntDoubleMap scoresMap) {
             for (int i = 0; i < edgeDestList.size(); i++) {
                 int i_id = edgeDestList.getQuick(i);
                 scoresMap.remove(i_id);
