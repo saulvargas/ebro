@@ -66,11 +66,11 @@ public class PLSARVF<U, I> extends RecommendationVerticesFactory<U, I, Object[]>
                         for (int z = 0; z < K; z++) {
                             pU_z[z] = 0;
                         }
-                        for (double[] qz_UI : qz_Ui.valueCollection()) {
+                        qz_Ui.valueCollection().stream().forEach((qz_UI) -> {
                             for (int z = 0; z < K; z++) {
                                 pU_z[z] += qz_UI[z];
                             }
-                        }
+                        });
                         for (int z = 0; z < K; z++) {
                             pU_z[z] /= normZ[z];
                         }
@@ -99,11 +99,11 @@ public class PLSARVF<U, I> extends RecommendationVerticesFactory<U, I, Object[]>
                         }
 
                         double[] normZU = new double[K];
-                        for (double[] qz_UI : qz_Ui.valueCollection()) {
+                        qz_Ui.valueCollection().stream().forEach((qz_UI) -> {
                             for (int z = 0; z < K; z++) {
                                 normZU[z] += qz_UI[z];
                             }
-                        }
+                        });
                         normZAggr.aggregate(normZU);
 
                         for (int i = 0; i < edgeDestList.size(); i++) {

@@ -13,8 +13,6 @@ import gnu.trove.map.TIntDoubleMap;
 import gnu.trove.map.TIntIntMap;
 import gnu.trove.map.hash.TIntDoubleHashMap;
 import gnu.trove.map.hash.TIntIntHashMap;
-import gnu.trove.procedure.TIntIntProcedure;
-import gnu.trove.procedure.TIntProcedure;
 import java.io.BufferedWriter;
 
 /**
@@ -145,22 +143,14 @@ public class ItemBasedKNNRVF<U, I> extends RecommendationVerticesFactory<U, I, O
                     final TIntDoubleTopN sim = new TIntDoubleTopN(N);
 
                     final double ni = edgeDestList.size();
-                    intersection.forEachEntry(new TIntIntProcedure() {
-
-                        @Override
-                        public boolean execute(int j_id, int i) {
-                            sim.add(j_id, i / (double) (ni + count.get(j_id) - i));
-                            return true;
-                        }
+                    intersection.forEachEntry((j_id, i1) -> {
+                        sim.add(j_id, i1 / (double) (ni + count.get(j_id) - i1));
+                        return true;
                     });
 
-                    users.forEach(new TIntProcedure() {
-
-                        @Override
-                        public boolean execute(int u_id) {
-                            sendMessage(u_id, new Object[]{MessageType.ITEM_REC_RESPONSE, sim});
-                            return true;
-                        }
+                    users.forEach(u_id -> {
+                        sendMessage(u_id, new Object[]{MessageType.ITEM_REC_RESPONSE, sim});
+                        return true;
                     });
 
                     users.clear();

@@ -8,6 +8,7 @@ package es.uam.eps.ir.ebro.examples;
 import es.uam.eps.ir.ebro.Ebro;
 import es.uam.eps.ir.ebro.examples.rs.PLSARVF;
 import es.uam.eps.ir.ebro.examples.rs.RecommendationVerticesFactory;
+import es.uam.eps.ir.ebro.examples.rs.RecommendationVerticesFactory.UserVertex;
 import java.io.BufferedReader;
 import java.io.BufferedWriter;
 import java.io.FileReader;
@@ -21,8 +22,9 @@ public class Recommendations {
 
     public static void main(String[] args) throws Exception {
         int nthreads = 6;
-        String path = "/home/saul/ceri2014/ml1M_fold1/train.data";
-//        String path = "u.data";
+//        String path = "/home/saul/ceri2014/ml1M_fold1/train.data";
+        String path = "u.data";
+//        String path = "/datacthulhu/saul/MSD/msd-song/train1.data";
 
         final Ebro ebro = new Ebro(nthreads, 5000, false, false);
 
@@ -31,9 +33,7 @@ public class Recommendations {
             RecommendationVerticesFactory<String, String, Object[]> rvf = new PLSARVF<>(ebro, 50, 200, 100, writer);
 
             try (BufferedReader reader = new BufferedReader(new FileReader(path))) {
-                String line;
-                while ((line = reader.readLine()) != null) {
-                    String[] tokens = line.split("\t");
+                reader.lines().map(line -> line.split("\t")).forEach(tokens -> {
                     String u = tokens[0];
                     String i = tokens[1];
 
@@ -41,12 +41,10 @@ public class Recommendations {
                     rvf.addItem(i);
 
                     rvf.addEdge(u, i);
-                }
+                });
             }
 
-            for (String user : rvf.getUsers()) {
-                rvf.getUserVertex(user).activate();
-            }
+            rvf.getUsers().stream().map(rvf::getUserVertex).forEach(UserVertex::activate);
 
             ebro.run();
         }

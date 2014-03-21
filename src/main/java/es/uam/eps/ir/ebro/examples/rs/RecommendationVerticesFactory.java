@@ -12,7 +12,6 @@ import gnu.trove.impl.Constants;
 import gnu.trove.map.TIntDoubleMap;
 import gnu.trove.map.TObjectIntMap;
 import gnu.trove.map.hash.TObjectIntHashMap;
-import gnu.trove.procedure.TIntDoubleProcedure;
 import java.io.BufferedWriter;
 import java.io.IOException;
 import java.util.Set;
@@ -48,7 +47,7 @@ public abstract class RecommendationVerticesFactory<U, I, M> {
             items.put(i, ebro.addVertex(createItemVertex(i)));
         }
     }
-    
+
     protected void addAggregator(Aggregator a) {
         ebro.addAgregator(a);
     }
@@ -100,7 +99,7 @@ public abstract class RecommendationVerticesFactory<U, I, M> {
         public void activate() {
             active = true;
         }
-        
+
         public void sendMessageToAllItems(M message) {
             for (int i_id : items.values()) {
                 sendMessage(i_id, message);
@@ -114,13 +113,9 @@ public abstract class RecommendationVerticesFactory<U, I, M> {
             }
 
             final TIntDoubleTopN topN = new TIntDoubleTopN(cutoff);
-            scoresMap.forEachEntry(new TIntDoubleProcedure() {
-
-                @Override
-                public boolean execute(int a, double b) {
-                    topN.add(a, b);
-                    return true;
-                }
+            scoresMap.forEachEntry((a, b) -> {
+                topN.add(a, b);
+                return true;
             });
             scoresMap.clear();
 
@@ -128,7 +123,7 @@ public abstract class RecommendationVerticesFactory<U, I, M> {
 
             synchronized (writer) {
                 try {
-                    for (int i = 0; i < topN.size(); i++) {
+                    for (int i = topN.size() - 1; i >= 0; i--) {
                         String i_id = ((ItemVertex<String, Object[]>) ebro.getVertex(topN.getKeyAt(i))).i_ml;
                         writer.write(u_ml + "\t" + i_id + "\t" + topN.getValueAt(i));
                         writer.newLine();
