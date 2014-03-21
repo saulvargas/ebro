@@ -8,6 +8,8 @@ import gnu.trove.set.TIntSet;
 import gnu.trove.set.hash.TDoubleHashSet;
 import gnu.trove.set.hash.TIntHashSet;
 import java.util.Random;
+import java.util.stream.IntStream;
+import java.util.stream.Stream;
 
 public class MaxValue {
 
@@ -18,9 +20,7 @@ public class MaxValue {
 
         Ebro ebro = new Ebro(6, N, true, false);
 
-        for (int i = 0; i < N; i++) {
-            ebro.addVertex(new MaxValueVertex((double) i));
-        }
+        IntStream.range(0, N).forEach(i -> ebro.addVertex(new MaxValueVertex((double) i)));
 
         Random rnd = new Random(123456L);
         int S = (int) ((p * N) * (N - 1));
@@ -64,21 +64,17 @@ public class MaxValue {
         }
 
         @Override
-        protected void compute(Iterable<Double> messages) {
-            double maxValue = Double.NEGATIVE_INFINITY;
-            for (double v : messages) {
-                if (v > maxValue) {
-                    maxValue = v;
-                }
-            }
+        protected void compute(Stream<Double> messages) {
+            double maxValue = messages.mapToDouble(Double::doubleValue).max().orElse(Double.NEGATIVE_INFINITY);
 
             if (superstep() == 0 || maxValue > value) {
                 if (maxValue > value) {
                     value = maxValue;
                 }
-                for (int i = 0; i < edgeDestList.size(); i++) {
-                    sendMessage(edgeDestList.getQuick(i), value);
-                }
+                edgeDestList.forEach(i_id -> {
+                    sendMessage(i_id, value);
+                    return true;
+                });
             } else {
                 voteToHalt();
             }

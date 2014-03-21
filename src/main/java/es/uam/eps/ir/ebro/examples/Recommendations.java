@@ -12,6 +12,8 @@ import java.io.BufferedReader;
 import java.io.BufferedWriter;
 import java.io.FileReader;
 import java.io.FileWriter;
+import java.util.HashMap;
+import java.util.Map;
 
 /**
  *
@@ -31,9 +33,8 @@ public class Recommendations {
             RecommendationVerticesFactory<String, String, Object[]> rvf = new PLSARVF<>(ebro, 50, 200, 100, writer);
 
             try (BufferedReader reader = new BufferedReader(new FileReader(path))) {
-                String line;
-                while ((line = reader.readLine()) != null) {
-                    String[] tokens = line.split("\t");
+
+                reader.lines().map(l -> l.split("\t")).forEach(tokens -> {
                     String u = tokens[0];
                     String i = tokens[1];
 
@@ -41,12 +42,15 @@ public class Recommendations {
                     rvf.addItem(i);
 
                     rvf.addEdge(u, i);
-                }
+                });
             }
-
-            for (String user : rvf.getUsers()) {
+            
+//            HashMap<Integer, Double> map = new HashMap<>();
+//            map.
+//            
+            rvf.getUsers().stream().forEach((user) -> {
                 rvf.getUserVertex(user).activate();
-            }
+            });
 
             ebro.run();
         }

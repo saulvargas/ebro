@@ -12,7 +12,6 @@ import gnu.trove.impl.Constants;
 import gnu.trove.map.TIntDoubleMap;
 import gnu.trove.map.TObjectIntMap;
 import gnu.trove.map.hash.TObjectIntHashMap;
-import gnu.trove.procedure.TIntDoubleProcedure;
 import java.io.BufferedWriter;
 import java.io.IOException;
 import java.util.Set;
@@ -114,13 +113,9 @@ public abstract class RecommendationVerticesFactory<U, I, M> {
             }
 
             final TIntDoubleTopN topN = new TIntDoubleTopN(cutoff);
-            scoresMap.forEachEntry(new TIntDoubleProcedure() {
-
-                @Override
-                public boolean execute(int a, double b) {
-                    topN.add(a, b);
-                    return true;
-                }
+            scoresMap.forEachEntry((a, b) -> {
+                topN.add(a, b);
+                return true;
             });
             scoresMap.clear();
 

@@ -8,8 +8,6 @@ import gnu.trove.map.TIntByteMap;
 import gnu.trove.map.TIntObjectMap;
 import gnu.trove.map.hash.TIntByteHashMap;
 import gnu.trove.map.hash.TIntObjectHashMap;
-import gnu.trove.procedure.TByteProcedure;
-import gnu.trove.procedure.TIntProcedure;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
@@ -19,6 +17,7 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.ThreadFactory;
 import java.util.logging.Level;
 import java.util.logging.Logger;
+import java.util.stream.Stream;
 
 public class Ebro {
 
@@ -67,13 +66,13 @@ public class Ebro {
 
         return v.id;
     }
-    
+
     public int addAgregator(Aggregator a) {
         a.configure(aggregatorCount, this);
         aggregators.put(aggregatorCount, a);
-        
+
         aggregatorCount++;
-        
+
         return a.id;
     }
 
@@ -100,32 +99,15 @@ public class Ebro {
     }
 
     private int numMessages() {
-        int n = 0;
-        for (List m : currentMessages.valueCollection()) {
-            n += m.size();
-        }
-        
-        return n;
+        return currentMessages.valueCollection().stream().mapToInt(List::size).sum();
     }
-    
-    private boolean hasMessages() {
-        for (List m : currentMessages.valueCollection()) {
-            if (!m.isEmpty()) {
-                return true;
-            }
-        }
 
-        return false;
+    private boolean hasMessages() {
+        return !currentMessages.valueCollection().stream().allMatch(List::isEmpty);
     }
 
     private boolean allToHalt() {
-        return votes.forEachValue(new TByteProcedure() {
-
-            @Override
-            public boolean execute(byte value) {
-                return value == HALT;
-            }
-        });
+        return votes.forEachValue(value -> value == HALT);
     }
 
     public boolean stop() {
@@ -135,25 +117,17 @@ public class Ebro {
     public void doSuperstep() {
 
         final List<Callable<Object>> tasks = new ArrayList<>();
-        vertices.forEachKey(new TIntProcedure() {
+        vertices.forEachKey(id -> {
+            tasks.add(Executors.callable(() -> {
+                List messages = currentMessages.get(id);
+                if (votes.get(id) == NOHALT || !messages.isEmpty()) {
+                    votes.put(id, NOHALT);
+                    vertices.get(id).compute(messages.stream());
+                }
+                messages.clear();
+            }));
 
-            @Override
-            public boolean execute(final int id) {
-                tasks.add(Executors.callable(new Runnable() {
-
-                    @Override
-                    public void run() {
-                        List messages = currentMessages.get(id);
-                        if (votes.get(id) == NOHALT || !messages.isEmpty()) {
-                            votes.put(id, NOHALT);
-                            vertices.get(id).compute(messages);
-                        }
-                        messages.clear();
-                    }
-                }));
-
-                return true;
-            }
+            return true;
         });
 
         if (threadPool != null) {
@@ -165,7 +139,7 @@ public class Ebro {
                         .getName()).log(Level.SEVERE, null, ex);
             }
         } else {
-            for (Callable<Object> task : tasks) {
+            tasks.stream().forEach(task -> {
                 try {
                     task.call();
 
@@ -173,13 +147,11 @@ public class Ebro {
                     Logger.getLogger(Ebro.class
                             .getName()).log(Level.SEVERE, null, ex);
                 }
-            }
+            });
         }
 
         tasks.clear();
-        for (Aggregator a : aggregators.valueCollection()) {
-            a.nextStep();
-        }
+        aggregators.valueCollection().stream().forEach(Aggregator::nextStep);
 
         superstep++;
         TIntObjectMap<List> aux;
@@ -241,7 +213,7 @@ public class Ebro {
             }
         }
 
-        protected abstract void compute(Iterable<M> messages);
+        protected abstract void compute(Stream<M> messages);
 
         protected final int superstep() {
             return ebro.superstep();
@@ -263,29 +235,29 @@ public class Ebro {
         protected Ebro ebro;
         protected T t0;
         protected T t1;
-        
+
         public Aggregator() {
         }
-        
+
         private void configure(int id, Ebro ebro) {
             this.id = id;
             this.ebro = ebro;
             this.t1 = init();
         }
-        
+
         private void nextStep() {
             t0 = t1;
             t1 = init();
         }
-        
+
         protected abstract T init();
-        
+
         protected abstract T aggregate(T t1, T t);
-        
+
         public synchronized void aggregate(T t) {
             t1 = aggregate(t1, t);
         }
-        
+
         public T getValue() {
             return t0;
         }

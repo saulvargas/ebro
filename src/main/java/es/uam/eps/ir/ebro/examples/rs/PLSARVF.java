@@ -14,6 +14,7 @@ import gnu.trove.map.hash.TIntDoubleHashMap;
 import gnu.trove.map.hash.TIntObjectHashMap;
 import java.io.BufferedWriter;
 import java.util.Random;
+import java.util.stream.Stream;
 
 /**
  *
@@ -51,7 +52,7 @@ public class PLSARVF<U, I> extends RecommendationVerticesFactory<U, I, Object[]>
             private boolean waiting = false;
 
             @Override
-            protected void compute(Iterable<Object[]> messages) {
+            protected void compute(Stream<Object[]> messages) {
                 if (superstep() < 2 * numIter) {
                     if (superstep() == 0) {
 
@@ -66,18 +67,18 @@ public class PLSARVF<U, I> extends RecommendationVerticesFactory<U, I, Object[]>
                         for (int z = 0; z < K; z++) {
                             pU_z[z] = 0;
                         }
-                        for (double[] qz_UI : qz_Ui.valueCollection()) {
+                        qz_Ui.valueCollection().stream().forEach(qz_UI -> {
                             for (int z = 0; z < K; z++) {
                                 pU_z[z] += qz_UI[z];
                             }
-                        }
+                        });
                         for (int z = 0; z < K; z++) {
                             pU_z[z] /= normZ[z];
                         }
 
                     } else if (superstep() % 2 == 1) {
 
-                        for (Object[] m : messages) {
+                        messages.forEach(m -> {
                             switch ((MessageType) m[0]) {
                                 case ITEM_EXPECTATION:
                                     int i_id = (Integer) m[1];
@@ -96,14 +97,14 @@ public class PLSARVF<U, I> extends RecommendationVerticesFactory<U, I, Object[]>
                                 default:
                                     break;
                             }
-                        }
+                        });
 
                         double[] normZU = new double[K];
-                        for (double[] qz_UI : qz_Ui.valueCollection()) {
+                        qz_Ui.valueCollection().stream().forEach(qz_UI -> {
                             for (int z = 0; z < K; z++) {
                                 normZU[z] += qz_UI[z];
                             }
-                        }
+                        });
                         normZAggr.aggregate(normZU);
 
                         for (int i = 0; i < edgeDestList.size(); i++) {
@@ -121,7 +122,7 @@ public class PLSARVF<U, I> extends RecommendationVerticesFactory<U, I, Object[]>
                     }
 
                     TIntDoubleMap scoresMap = new TIntDoubleHashMap(Constants.DEFAULT_CAPACITY, Constants.DEFAULT_LOAD_FACTOR, -1, 0.0);
-                    for (Object[] m : messages) {
+                    messages.forEach(m -> {
                         switch ((MessageType) m[0]) {
                             case ITEM_REC_RESPONSE:
                                 int i_id = (Integer) m[1];
@@ -134,7 +135,7 @@ public class PLSARVF<U, I> extends RecommendationVerticesFactory<U, I, Object[]>
                             default:
                                 break;
                         }
-                    }
+                    });
 
                     if (active && !waiting) {
                         printResults(scoresMap);
@@ -159,7 +160,7 @@ public class PLSARVF<U, I> extends RecommendationVerticesFactory<U, I, Object[]>
             private final double[] pIz = initVector(K);
 
             @Override
-            protected void compute(Iterable<Object[]> messages) {
+            protected void compute(Stream<Object[]> messages) {
                 if (superstep() < 2 * numIter) {
 
                     if (superstep() % 2 == 0) {
@@ -169,7 +170,7 @@ public class PLSARVF<U, I> extends RecommendationVerticesFactory<U, I, Object[]>
                             }
                         }
 
-                        for (Object[] m : messages) {
+                        messages.forEach(m -> {
                             switch ((MessageType) m[0]) {
                                 case USER_MAXIMIZATION:
                                     double[] qz_UI = (double[]) m[1];
@@ -181,7 +182,7 @@ public class PLSARVF<U, I> extends RecommendationVerticesFactory<U, I, Object[]>
                                 default:
                                     break;
                             }
-                        }
+                        });
 
                         for (int i = 0; i < edgeDestList.size(); i++) {
                             int u_id = edgeDestList.getQuick(i);
@@ -191,7 +192,7 @@ public class PLSARVF<U, I> extends RecommendationVerticesFactory<U, I, Object[]>
 
                 } else {
 
-                    for (Object[] m : messages) {
+                    messages.forEach(m -> {
                         switch ((MessageType) m[0]) {
                             case USER_REC_REQUEST:
                                 int u_id = (Integer) m[1];
@@ -207,7 +208,7 @@ public class PLSARVF<U, I> extends RecommendationVerticesFactory<U, I, Object[]>
                             default:
                                 break;
                         }
-                    }
+                    });
 
                     voteToHalt();
 

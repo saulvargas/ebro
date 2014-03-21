@@ -6,6 +6,7 @@ import gnu.trove.impl.Constants;
 import gnu.trove.set.TIntSet;
 import gnu.trove.set.hash.TIntHashSet;
 import java.util.Random;
+import java.util.stream.Stream;
 
 public class SingleSourceShortestPath {
 
@@ -69,11 +70,9 @@ public class SingleSourceShortestPath {
         }
 
         @Override
-        protected void compute(Iterable<Double> messages) {
+        protected void compute(Stream<Double> messages) {
             double minDist = source == id ? 0.0 : Double.POSITIVE_INFINITY;
-            for (double otherDist : messages) {
-                minDist = Math.min(minDist, otherDist);
-            }
+            minDist = messages.mapToDouble(Double::doubleValue).min().orElse(minDist);
 
             if (minDist < dist) {
                 dist = minDist;
