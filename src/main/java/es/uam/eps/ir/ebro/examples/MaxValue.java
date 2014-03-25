@@ -7,9 +7,9 @@ import gnu.trove.set.TDoubleSet;
 import gnu.trove.set.TIntSet;
 import gnu.trove.set.hash.TDoubleHashSet;
 import gnu.trove.set.hash.TIntHashSet;
+import java.util.Collection;
 import java.util.Random;
 import java.util.stream.IntStream;
-import java.util.stream.Stream;
 
 public class MaxValue {
 
@@ -64,8 +64,8 @@ public class MaxValue {
         }
 
         @Override
-        protected void compute(Stream<Double> messages) {
-            double maxValue = messages.mapToDouble(Double::doubleValue).max().orElse(Double.NEGATIVE_INFINITY);
+        protected void compute(Collection<Double> messages) {
+            double maxValue = messages.stream().mapToDouble(Double::doubleValue).max().orElse(Double.NEGATIVE_INFINITY);
 
             if (superstep() == 0 || maxValue > value) {
                 if (maxValue > value) {

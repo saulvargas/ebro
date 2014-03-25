@@ -14,6 +14,12 @@ import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.Callable;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.ThreadFactory;
+import java.util.logging.Level;
+import java.util.logging.Logger;
 
 public class Ebro {
 
@@ -25,6 +31,8 @@ public class Ebro {
     private TIntObjectMap<List> currentMessages;
     private TIntObjectMap<List> futureMessages;
     private final TIntByteMap votes;
+    private final ExecutorService threadPool;
+    private final int nthreads;
     private int vertexCount;
     private int aggregatorCount;
     private final boolean directed;
@@ -39,6 +47,13 @@ public class Ebro {
         this.votes = new TIntByteHashMap(nvertices, Constants.DEFAULT_LOAD_FACTOR, -1, HALT);
         this.directed = directed;
         this.weighted = weighted;
+
+        this.nthreads = nthreads;
+        if (nthreads > 0) {
+            this.threadPool = Executors.newFixedThreadPool(nthreads, new CustomThreadFactory());
+        } else {
+            this.threadPool = null;
+        }
 
         vertexCount = 0;
         aggregatorCount = 0;
@@ -105,50 +120,48 @@ public class Ebro {
 
     public void doSuperstep() {
 
-//        final List<Callable<Object>> tasks = new ArrayList<>();
-//        vertices.forEachKey(id -> {
-//            tasks.add(Executors.callable(() -> {
-//                List messages = currentMessages.get(id);
-//                if (votes.get(id) == NOHALT || !messages.isEmpty()) {
-//                    votes.put(id, NOHALT);
-//                    vertices.get(id).compute(messages.stream());
-//                }
-//                messages.clear();
-//            }));
-//
-//            return true;
-//        });
-//
-//        if (threadPool != null) {
-//            try {
-//                threadPool.invokeAll(tasks);
-//
-//            } catch (InterruptedException ex) {
-//                Logger.getLogger(Ebro.class
-//                        .getName()).log(Level.SEVERE, null, ex);
-//            }
-//        } else {
-//            tasks.stream().forEach(task -> {
-//                try {
-//                    task.call();
-//
-//                } catch (Exception ex) {
-//                    Logger.getLogger(Ebro.class
-//                            .getName()).log(Level.SEVERE, null, ex);
-//                }
-//            });
-//        }
-//
-//        tasks.clear();
-
-        vertices.entrySet().parallelStream().forEach(e -> {
-            List messages = currentMessages.get(e.getKey());
-            if (votes.get(e.getKey()) == NOHALT || !messages.isEmpty()) {
-                votes.put(e.getKey(), NOHALT);
-                e.getValue().compute(messages);
-            }
-            messages.clear();
+        final List<Callable<Object>> tasks = new ArrayList<>();
+        vertices.forEach((id, vertex) -> {
+            tasks.add(Executors.callable(() -> {
+                List messages = currentMessages.get(id);
+                if (votes.get(id) == NOHALT || !messages.isEmpty()) {
+                    votes.put(id, NOHALT);
+                    vertex.compute(messages);
+                }
+                messages.clear();
+            }));
         });
+
+        if (nthreads < 0) {
+            vertices.entrySet().parallelStream().forEach(e -> {
+                List messages = currentMessages.get(e.getKey());
+                if (votes.get(e.getKey()) == NOHALT || !messages.isEmpty()) {
+                    votes.put(e.getKey(), NOHALT);
+                    e.getValue().compute(messages);
+                }
+                messages.clear();
+            });
+        } else {
+            if (threadPool != null) {
+                try {
+                    threadPool.invokeAll(tasks);
+
+                } catch (InterruptedException ex) {
+                    Logger.getLogger(Ebro.class
+                            .getName()).log(Level.SEVERE, null, ex);
+                }
+            } else {
+                tasks.stream().forEach(task -> {
+                    try {
+                        task.call();
+                    } catch (Exception ex) {
+                        Logger.getLogger(Ebro.class.getName()).log(Level.SEVERE, null, ex);
+                    }
+                });
+            }
+
+            tasks.clear();
+        }
 
         aggregators.valueCollection().stream().forEach(Aggregator::nextStep);
 
@@ -171,6 +184,18 @@ public class Ebro {
         futureMessages.get(dst).add(message);
 
     }
+
+    private static class CustomThreadFactory implements ThreadFactory {
+
+        private static final ThreadFactory defaultFactory = Executors.defaultThreadFactory();
+
+        @Override
+        public Thread newThread(Runnable r) {
+            Thread t = defaultFactory.newThread(r);
+            t.setDaemon(true);
+            return t;
+        }
+    };
 
     public static abstract class Vertex<M> {
 

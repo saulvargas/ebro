@@ -192,7 +192,7 @@ public class PLSARVF<U, I> extends RecommendationVerticesFactory<U, I, Object[]>
 
                 } else {
 
-                    messages.forEach(m -> {
+                    messages.parallelStream().forEach(m -> {
                         switch ((MessageType) m[0]) {
                             case USER_REC_REQUEST:
                                 int u_id = (Integer) m[1];

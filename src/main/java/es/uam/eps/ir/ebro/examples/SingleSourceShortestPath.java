@@ -5,8 +5,8 @@ import es.uam.eps.ir.ebro.Ebro.Vertex;
 import gnu.trove.impl.Constants;
 import gnu.trove.set.TIntSet;
 import gnu.trove.set.hash.TIntHashSet;
+import java.util.Collection;
 import java.util.Random;
-import java.util.stream.Stream;
 
 public class SingleSourceShortestPath {
 
@@ -70,9 +70,9 @@ public class SingleSourceShortestPath {
         }
 
         @Override
-        protected void compute(Stream<Double> messages) {
+        protected void compute(Collection<Double> messages) {
             double minDist = source == id ? 0.0 : Double.POSITIVE_INFINITY;
-            minDist = messages.mapToDouble(Double::doubleValue).min().orElse(minDist);
+            minDist = messages.stream().mapToDouble(Double::doubleValue).min().orElse(minDist);
 
             if (minDist < dist) {
                 dist = minDist;

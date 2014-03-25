@@ -14,7 +14,7 @@ import gnu.trove.map.TIntIntMap;
 import gnu.trove.map.hash.TIntDoubleHashMap;
 import gnu.trove.map.hash.TIntIntHashMap;
 import java.io.BufferedWriter;
-import java.util.stream.Stream;
+import java.util.Collection;
 
 /**
  *
@@ -44,7 +44,7 @@ public class ItemBasedKNNRVF<U, I> extends RecommendationVerticesFactory<U, I, O
             private boolean waiting = false;
 
             @Override
-            protected void compute(Stream<Object[]> messages) {
+            protected void compute(Collection<Object[]> messages) {
                 if (active && !waiting) {
                     for (int i = 0; i < edgeDestList.size(); i++) {
                         int i_id = edgeDestList.getQuick(i);
@@ -106,7 +106,7 @@ public class ItemBasedKNNRVF<U, I> extends RecommendationVerticesFactory<U, I, O
             private final TIntArrayList users = new TIntArrayList();
 
             @Override
-            protected void compute(Stream<Object[]> messages) {
+            protected void compute(Collection<Object[]> messages) {
                 if (active && !waiting) {
                     for (int i = 0; i < edgeDestList.size(); i++) {
                         int v_id = edgeDestList.getQuick(i);
