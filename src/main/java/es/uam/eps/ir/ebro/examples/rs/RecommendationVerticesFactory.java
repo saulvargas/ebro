@@ -47,7 +47,7 @@ public abstract class RecommendationVerticesFactory<U, I, M> {
             items.put(i, ebro.addVertex(createItemVertex(i)));
         }
     }
-    
+
     protected void addAggregator(Aggregator a) {
         ebro.addAgregator(a);
     }
@@ -99,7 +99,7 @@ public abstract class RecommendationVerticesFactory<U, I, M> {
         public void activate() {
             active = true;
         }
-        
+
         public void sendMessageToAllItems(M message) {
             for (int i_id : items.values()) {
                 sendMessage(i_id, message);
@@ -123,7 +123,7 @@ public abstract class RecommendationVerticesFactory<U, I, M> {
 
             synchronized (writer) {
                 try {
-                    for (int i = 0; i < topN.size(); i++) {
+                    for (int i = topN.size() - 1; i >= 0; i--) {
                         String i_id = ((ItemVertex<String, Object[]>) ebro.getVertex(topN.getKeyAt(i))).i_ml;
                         writer.write(u_ml + "\t" + i_id + "\t" + topN.getValueAt(i));
                         writer.newLine();

@@ -13,8 +13,8 @@ import gnu.trove.map.TIntObjectMap;
 import gnu.trove.map.hash.TIntDoubleHashMap;
 import gnu.trove.map.hash.TIntObjectHashMap;
 import java.io.BufferedWriter;
+import java.util.Collection;
 import java.util.Random;
-import java.util.stream.Stream;
 
 /**
  *
@@ -52,7 +52,7 @@ public class PLSARVF<U, I> extends RecommendationVerticesFactory<U, I, Object[]>
             private boolean waiting = false;
 
             @Override
-            protected void compute(Stream<Object[]> messages) {
+            protected void compute(Collection<Object[]> messages) {
                 if (superstep() < 2 * numIter) {
                     if (superstep() == 0) {
 
@@ -160,7 +160,7 @@ public class PLSARVF<U, I> extends RecommendationVerticesFactory<U, I, Object[]>
             private final double[] pIz = initVector(K);
 
             @Override
-            protected void compute(Stream<Object[]> messages) {
+            protected void compute(Collection<Object[]> messages) {
                 if (superstep() < 2 * numIter) {
 
                     if (superstep() % 2 == 0) {

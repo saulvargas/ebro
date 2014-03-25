@@ -42,7 +42,7 @@
                 <configuration>
                     <source>1.8</source>
                     <target>1.8</target>
-                    <mainClass>es.uam.eps.ir.ebro.examples.ItemBasedKNNRecommender</mainClass>
+                    <mainClass>es.uam.eps.ir.ebro.examples.Recommendations</mainClass>
                 </configuration>
             </plugin>
 
@@ -56,7 +56,7 @@
                         <manifest>
                             <classpathPrefix>lib/</classpathPrefix>
                             <addClasspath>true</addClasspath>
-                            <mainClass>es.uam.eps.ir.ebro.examples.ItemBasedKNNRecommender</mainClass>
+                            <mainClass>es.uam.eps.ir.ebro.examples.Recommendations</mainClass>
                         </manifest>
                     </archive>
                 </configuration>
