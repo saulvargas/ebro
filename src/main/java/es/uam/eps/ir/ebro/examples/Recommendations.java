@@ -6,6 +6,7 @@
 package es.uam.eps.ir.ebro.examples;
 
 import es.uam.eps.ir.ebro.Ebro;
+import es.uam.eps.ir.ebro.examples.rs.PLSARVF;
 import es.uam.eps.ir.ebro.examples.rs.ItemBasedKNNRVF;
 import es.uam.eps.ir.ebro.examples.rs.RecommendationVerticesFactory;
 import es.uam.eps.ir.ebro.examples.rs.RecommendationVerticesFactory.UserVertex;
@@ -13,6 +14,11 @@ import java.io.BufferedReader;
 import java.io.BufferedWriter;
 import java.io.FileReader;
 import java.io.FileWriter;
+import java.io.IOException;
+import java.io.UncheckedIOException;
+import java.util.HashMap;
+import java.util.Map;
+import java.util.function.BiFunction;
 
 /**
  *
@@ -21,31 +27,40 @@ import java.io.FileWriter;
 public class Recommendations {
 
     public static void main(String[] args) throws Exception {
-        int nthreads = -1;
-        String path = "/home/saul/ceri2014/ml1M_fold1/train.data";
+        String fileIn = null;
+        String dirOut = null;
+        int nthreads = 6;
 
-        final Ebro ebro = new Ebro(nthreads, 5000, false, false);
+        Map<String, BiFunction<Ebro, BufferedWriter, RecommendationVerticesFactory<String, String, Object[]>>> rvfMap = new HashMap<>();
 
-        try (BufferedWriter writer = new BufferedWriter(new FileWriter("rec"))) {
-            RecommendationVerticesFactory<String, String, Object[]> rvf = new ItemBasedKNNRVF<>(ebro, writer, 100, 50);
-//            RecommendationVerticesFactory<String, String, Object[]> rvf = new PLSARVF<>(ebro, 50, 20, 100, writer);
+        rvfMap.put("ib", (ebro, writer) -> new ItemBasedKNNRVF<>(ebro, writer, 100, 50));
+        rvfMap.put("plsa", (ebro, writer) -> new PLSARVF<>(ebro, 50, 200, 100, writer));
 
-            try (BufferedReader reader = new BufferedReader(new FileReader(path))) {
+        rvfMap.forEach((name, supplier) -> {
+            try (BufferedWriter writer = new BufferedWriter(new FileWriter(dirOut + name))) {
+                final Ebro ebro = new Ebro(nthreads, 5000, false, false);
 
-                reader.lines().map(l -> l.split("\t")).forEach(tokens -> {
-                    String u = tokens[0];
-                    String i = tokens[1];
+                RecommendationVerticesFactory<String, String, Object[]> rvf = supplier.apply(ebro, writer);
+                
+                try (BufferedReader reader = new BufferedReader(new FileReader(fileIn))) {
 
-                    rvf.addUser(u);
-                    rvf.addItem(i);
+                    reader.lines().map(l -> l.split("\t")).forEach(tokens -> {
+                        String u = tokens[0];
+                        String i = tokens[1];
 
-                    rvf.addEdge(u, i);
-                });
+                        rvf.addUser(u);
+                        rvf.addItem(i);
+
+                        rvf.addEdge(u, i);
+                    });
+                }
+
+                rvf.getUsers().stream().map(rvf::getUserVertex).forEach(UserVertex::activate);
+
+                ebro.run();
+            } catch (IOException ex) {
+                throw new UncheckedIOException(ex);
             }
-
-            rvf.getUsers().stream().map(rvf::getUserVertex).forEach(UserVertex::activate);
-
-            ebro.run();
-        }
+        });
     }
 }
