@@ -7,6 +7,7 @@ package es.uam.eps.ir.ebro.examples;
 
 import es.uam.eps.ir.ebro.Ebro;
 import es.uam.eps.ir.ebro.examples.rs.PLSARVF;
+import es.uam.eps.ir.ebro.examples.rs.ItemBasedKNNRVF;
 import es.uam.eps.ir.ebro.examples.rs.RecommendationVerticesFactory;
 import es.uam.eps.ir.ebro.examples.rs.RecommendationVerticesFactory.UserVertex;
 import java.io.BufferedReader;
@@ -25,12 +26,13 @@ public class Recommendations {
 //        String path = "/home/saul/ceri2014/ml1M_fold1/train.data";
         String path = "u.data";
 //        String path = "/datacthulhu/saul/MSD/msd-song/train1.data";
+//	String path = "/collections/saul/recsys2014/netflix_fold5/train.data";
 
         final Ebro ebro = new Ebro(nthreads, 5000, false, false);
 
         try (BufferedWriter writer = new BufferedWriter(new FileWriter("rec"))) {
-//            RecommendationVerticesFactory<String, String, Object[]> rvf = new ItemBasedKNNRVF<>(ebro, writer, 100, 50);
-            RecommendationVerticesFactory<String, String, Object[]> rvf = new PLSARVF<>(ebro, 50, 200, 100, writer);
+            RecommendationVerticesFactory<String, String, Object[]> rvf = new ItemBasedKNNRVF<>(ebro, writer, 100, 50);
+//            RecommendationVerticesFactory<String, String, Object[]> rvf = new PLSARVF<>(ebro, 50, 200, 100, writer);
 
             try (BufferedReader reader = new BufferedReader(new FileReader(path))) {
                 reader.lines().map(line -> line.split("\t")).forEach(tokens -> {
