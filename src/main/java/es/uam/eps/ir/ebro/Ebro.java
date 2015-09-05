@@ -1,69 +1,74 @@
+/* 
+ * Copyright (C) 2015 Saúl Vargas (saul@vargassandoval.es)
+ *
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
+ */
 package es.uam.eps.ir.ebro;
 
 import es.uam.eps.ir.ebro.Ebro.Vertex;
-import gnu.trove.impl.Constants;
-import gnu.trove.list.array.TDoubleArrayList;
-import gnu.trove.list.array.TIntArrayList;
-import gnu.trove.map.TIntByteMap;
-import gnu.trove.map.TIntObjectMap;
-import gnu.trove.map.hash.TIntByteHashMap;
-import gnu.trove.map.hash.TIntObjectHashMap;
+import it.unimi.dsi.fastutil.doubles.DoubleArrayList;
+import it.unimi.dsi.fastutil.ints.Int2ByteMap;
+import it.unimi.dsi.fastutil.ints.Int2ByteOpenHashMap;
+import it.unimi.dsi.fastutil.ints.Int2ObjectMap;
+import it.unimi.dsi.fastutil.ints.Int2ObjectOpenHashMap;
+import it.unimi.dsi.fastutil.ints.IntArrayList;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
-import java.util.HashMap;
 import java.util.List;
-import java.util.Map;
-import java.util.concurrent.Callable;
-import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
-import java.util.concurrent.ThreadFactory;
-import java.util.logging.Level;
-import java.util.logging.Logger;
 
-public class Ebro {
+/**
+ * The Pregel-like engine of the system.
+ *
+ * @author Saúl Vargas (saul@vargassandoval.es)
+ * @param <M>
+ */
+public class Ebro<M> {
 
     private static final byte NOHALT = (byte) 0;
     private static final byte HALT = (byte) 1;
     private int superstep;
-    private final Map<Integer, Vertex> vertices;
-    private final TIntObjectMap<Aggregator> aggregators;
-    private TIntObjectMap<List> currentMessages;
-    private TIntObjectMap<List> futureMessages;
-    private final TIntByteMap votes;
-    private final ExecutorService threadPool;
-    private final int nthreads;
+    private final Int2ObjectMap<Vertex<M>> vertices;
+    private final Int2ObjectMap<Aggregator> aggregators;
+    private Int2ObjectMap<List<M>> currentMessages;
+    private Int2ObjectMap<List<M>> futureMessages;
+    private final Int2ByteMap votes;
     private int vertexCount;
     private int aggregatorCount;
     private final boolean directed;
     private final boolean weighted;
 
-    public Ebro(int nthreads, int nvertices, boolean directed, boolean weighted) {
+    public Ebro(int nvertices, boolean directed, boolean weighted) {
         this.superstep = 0;
-        this.vertices = new HashMap<>();
-        this.aggregators = new TIntObjectHashMap<>();
-        this.currentMessages = new TIntObjectHashMap<>(nvertices, Constants.DEFAULT_LOAD_FACTOR, -1);
-        this.futureMessages = new TIntObjectHashMap<>(nvertices, Constants.DEFAULT_LOAD_FACTOR, -1);
-        this.votes = new TIntByteHashMap(nvertices, Constants.DEFAULT_LOAD_FACTOR, -1, HALT);
+        this.vertices = new Int2ObjectOpenHashMap<>();
+        this.aggregators = new Int2ObjectOpenHashMap<>();
+        this.currentMessages = new Int2ObjectOpenHashMap<>(nvertices);
+        this.futureMessages = new Int2ObjectOpenHashMap<>(nvertices);
+        this.votes = new Int2ByteOpenHashMap(nvertices);
+        this.votes.defaultReturnValue(HALT);
         this.directed = directed;
         this.weighted = weighted;
-
-        this.nthreads = nthreads;
-        if (nthreads > 0) {
-            this.threadPool = Executors.newFixedThreadPool(nthreads, new CustomThreadFactory());
-        } else {
-            this.threadPool = null;
-        }
 
         vertexCount = 0;
         aggregatorCount = 0;
     }
 
-    public int addVertex(Vertex v) {
+    public int addVertex(Vertex<M> v) {
         v.configure(vertexCount, this, weighted);
         vertices.put(v.id, v);
-        currentMessages.put(v.id, Collections.synchronizedList(new ArrayList()));
-        futureMessages.put(v.id, Collections.synchronizedList(new ArrayList()));
+        currentMessages.put(v.id, Collections.synchronizedList(new ArrayList<>()));
+        futureMessages.put(v.id, Collections.synchronizedList(new ArrayList<>()));
         votes.put(v.id, NOHALT);
 
         vertexCount++;
@@ -80,7 +85,7 @@ public class Ebro {
         return a.id;
     }
 
-    public Vertex getVertex(int id) {
+    public Vertex<M> getVertex(int id) {
         return vertices.get(id);
     }
 
@@ -103,15 +108,15 @@ public class Ebro {
     }
 
     private int numMessages() {
-        return currentMessages.valueCollection().stream().mapToInt(List::size).sum();
+        return currentMessages.values().stream().mapToInt(List::size).sum();
     }
 
     private boolean hasMessages() {
-        return !currentMessages.valueCollection().stream().allMatch(List::isEmpty);
+        return !currentMessages.values().stream().allMatch(List::isEmpty);
     }
 
     private boolean allToHalt() {
-        return votes.forEachValue(value -> value == HALT);
+        return !votes.containsValue(NOHALT);
     }
 
     public boolean stop() {
@@ -119,54 +124,21 @@ public class Ebro {
     }
 
     public void doSuperstep() {
-
-        final List<Callable<Object>> tasks = new ArrayList<>();
-        vertices.forEach((id, vertex) -> {
-            tasks.add(Executors.callable(() -> {
-                List messages = currentMessages.get(id);
-                if (votes.get(id) == NOHALT || !messages.isEmpty()) {
-                    votes.put(id, NOHALT);
-                    vertex.compute(messages);
-                }
-                messages.clear();
-            }));
+        vertices.int2ObjectEntrySet().parallelStream().forEach(e -> {
+            int id = e.getIntKey();
+            Vertex<M> vertex = e.getValue();
+            List<M> messages = currentMessages.get(e.getKey());
+            if (votes.get(id) == NOHALT || !messages.isEmpty()) {
+                votes.put(id, NOHALT);
+                vertex.compute(messages);
+            }
+            messages.clear();
         });
 
-        if (nthreads < 0) {
-            vertices.entrySet().parallelStream().forEach(e -> {
-                List messages = currentMessages.get(e.getKey());
-                if (votes.get(e.getKey()) == NOHALT || !messages.isEmpty()) {
-                    votes.put(e.getKey(), NOHALT);
-                    e.getValue().compute(messages);
-                }
-                messages.clear();
-            });
-        } else {
-            if (threadPool != null) {
-                try {
-                    threadPool.invokeAll(tasks);
-
-                } catch (InterruptedException ex) {
-                    Logger.getLogger(Ebro.class
-                            .getName()).log(Level.SEVERE, null, ex);
-                }
-            } else {
-                tasks.stream().forEach(task -> {
-                    try {
-                        task.call();
-                    } catch (Exception ex) {
-                        Logger.getLogger(Ebro.class.getName()).log(Level.SEVERE, null, ex);
-                    }
-                });
-            }
-
-            tasks.clear();
-        }
-
-        aggregators.valueCollection().stream().forEach(Aggregator::nextStep);
+        aggregators.values().stream().forEach(Aggregator::nextStep);
 
         superstep++;
-        TIntObjectMap<List> aux;
+        Int2ObjectMap<List<M>> aux;
         aux = currentMessages;
         currentMessages = futureMessages;
         futureMessages = aux;
@@ -180,39 +152,26 @@ public class Ebro {
         votes.put(id, HALT);
     }
 
-    protected void sendMessage(int dst, Object message) {
+    protected void sendMessage(int dst, M message) {
         futureMessages.get(dst).add(message);
-
     }
-
-    private static class CustomThreadFactory implements ThreadFactory {
-
-        private static final ThreadFactory defaultFactory = Executors.defaultThreadFactory();
-
-        @Override
-        public Thread newThread(Runnable r) {
-            Thread t = defaultFactory.newThread(r);
-            t.setDaemon(true);
-            return t;
-        }
-    };
 
     public static abstract class Vertex<M> {
 
         protected int id;
-        protected Ebro ebro;
-        protected final TIntArrayList edgeDestList;
-        protected TDoubleArrayList edgeWeightList;
+        protected Ebro<M> ebro;
+        protected final IntArrayList edgeDestList;
+        protected DoubleArrayList edgeWeightList;
 
         public Vertex() {
-            this.edgeDestList = new TIntArrayList();
+            this.edgeDestList = new IntArrayList();
         }
 
-        private void configure(int id, Ebro ebro, boolean weighted) {
+        private void configure(int id, Ebro<M> ebro, boolean weighted) {
             this.id = id;
             this.ebro = ebro;
             if (weighted) {
-                edgeWeightList = new TDoubleArrayList();
+                edgeWeightList = new DoubleArrayList();
             } else {
                 edgeWeightList = null;
             }

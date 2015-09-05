@@ -1,16 +1,38 @@
+/* 
+ * Copyright (C) 2015 Saúl Vargas (saul@vargassandoval.es)
+ *
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
+ */
 package es.uam.eps.ir.ebro.examples;
 
 import es.uam.eps.ir.ebro.Ebro;
 import es.uam.eps.ir.ebro.Ebro.Vertex;
-import gnu.trove.impl.Constants;
-import gnu.trove.set.TDoubleSet;
-import gnu.trove.set.TIntSet;
-import gnu.trove.set.hash.TDoubleHashSet;
-import gnu.trove.set.hash.TIntHashSet;
+import it.unimi.dsi.fastutil.doubles.DoubleOpenHashSet;
+import it.unimi.dsi.fastutil.doubles.DoubleSet;
+import it.unimi.dsi.fastutil.ints.IntOpenHashSet;
+import it.unimi.dsi.fastutil.ints.IntSet;
+import static java.lang.Math.max;
 import java.util.Collection;
 import java.util.Random;
 import java.util.stream.IntStream;
 
+/**
+ * Example: find the maximum value of each connected component
+ * of a graph.
+ *
+ * @author Saúl Vargas (saul@vargassandoval.es)
+ */
 public class MaxValue {
 
     public static void main(String[] args) {
@@ -18,16 +40,16 @@ public class MaxValue {
         int N = 500000;
         double p = 0.0001;
 
-        Ebro ebro = new Ebro(6, N, true, false);
+        Ebro<Double> ebro = new Ebro<>(N, true, false);
 
         IntStream.range(0, N).forEach(i -> ebro.addVertex(new MaxValueVertex((double) i)));
 
         Random rnd = new Random(123456L);
         int S = (int) ((p * N) * (N - 1));
 
-        TIntSet[] edges = new TIntSet[N];
+        IntSet[] edges = new IntSet[N];
         for (int i = 0; i < N; i++) {
-            edges[i] = new TIntHashSet(Constants.DEFAULT_CAPACITY, Constants.DEFAULT_LOAD_FACTOR, -1);
+            edges[i] = new IntOpenHashSet();
         }
 
         for (int s = 0; s < S; s++) {
@@ -43,7 +65,7 @@ public class MaxValue {
 
         ebro.run();
 
-        TDoubleSet set = new TDoubleHashSet();
+        DoubleSet set = new DoubleOpenHashSet();
         for (int i = 0; i < N; i++) {
             MaxValueVertex v = (MaxValueVertex) ebro.getVertex(i);
             set.add(v.value);
@@ -51,12 +73,12 @@ public class MaxValue {
 
         System.out.println(ebro.superstep());
         System.out.println(set.size());
-        System.out.println(set.iterator().next());
+        System.out.println(set.iterator().nextDouble());
     }
 
     public static class MaxValueVertex extends Vertex<Double> {
 
-        public double value;
+        public Double value;
 
         public MaxValueVertex(double value) {
             super();
@@ -65,16 +87,12 @@ public class MaxValue {
 
         @Override
         protected void compute(Collection<Double> messages) {
-            double maxValue = messages.stream().mapToDouble(Double::doubleValue).max().orElse(Double.NEGATIVE_INFINITY);
+            double maxValue = messages.stream().mapToDouble(Double::doubleValue)
+                    .max().orElse(Double.NEGATIVE_INFINITY);
 
             if (superstep() == 0 || maxValue > value) {
-                if (maxValue > value) {
-                    value = maxValue;
-                }
-                edgeDestList.forEach(i_id -> {
-                    sendMessage(i_id, value);
-                    return true;
-                });
+                value = max(value, maxValue);
+                edgeDestList.forEach(i_id -> sendMessage(i_id, value));
             } else {
                 voteToHalt();
             }

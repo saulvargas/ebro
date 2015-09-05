@@ -1,39 +1,55 @@
-/*
- * To change this license header, choose License Headers in Project Properties.
- * To change this template file, choose Tools | Templates
- * and open the template in the editor.
+/* 
+ * Copyright (C) 2015 Saúl Vargas (saul@vargassandoval.es)
+ *
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 package es.uam.eps.ir.ebro.examples.rs;
 
 import es.uam.eps.ir.ebro.Ebro;
 import es.uam.eps.ir.ebro.Ebro.Aggregator;
-import es.uam.eps.ir.utils.dstructs.TIntDoubleTopN;
-import gnu.trove.impl.Constants;
-import gnu.trove.map.TIntDoubleMap;
-import gnu.trove.map.TObjectIntMap;
-import gnu.trove.map.hash.TObjectIntHashMap;
+import es.uam.eps.ir.ranksys.core.util.topn.TopN;
+import it.unimi.dsi.fastutil.ints.Int2DoubleMap;
+import it.unimi.dsi.fastutil.ints.Int2DoubleMap.Entry;
+import it.unimi.dsi.fastutil.objects.Object2IntMap;
+import it.unimi.dsi.fastutil.objects.Object2IntOpenHashMap;
 import java.io.BufferedWriter;
 import java.io.IOException;
+import java.io.UncheckedIOException;
+import java.util.Comparator;
 import java.util.Set;
-import java.util.logging.Level;
-import java.util.logging.Logger;
 
 /**
+ * Vertices factory for recommendation algorithms.
  *
- * @author saul
+ * @author Saúl Vargas (saul@vargassandoval.es)
  */
 public abstract class RecommendationVerticesFactory<U, I, M> {
 
     private final int cutoff;
     private final BufferedWriter writer;
-    private final Ebro ebro;
-    private final TObjectIntMap<U> users = new TObjectIntHashMap<>(Constants.DEFAULT_CAPACITY, Constants.DEFAULT_LOAD_FACTOR, -1);
-    private final TObjectIntMap<I> items = new TObjectIntHashMap<>(Constants.DEFAULT_CAPACITY, Constants.DEFAULT_LOAD_FACTOR, -1);
+    private final Ebro<M> ebro;
+    private final Object2IntMap<U> users;
+    private final Object2IntMap<I> items;
 
-    public RecommendationVerticesFactory(Ebro ebro, int cutoff, BufferedWriter writer) {
-        this.ebro = ebro;
+    public RecommendationVerticesFactory(Ebro<M> ebro, int cutoff, BufferedWriter writer) {
         this.cutoff = cutoff;
         this.writer = writer;
+        this.ebro = ebro;
+        this.users = new Object2IntOpenHashMap<>();
+        this.users.defaultReturnValue(-1);
+        this.items = new Object2IntOpenHashMap<>();
+        this.items.defaultReturnValue(-1);
     }
 
     public void addUser(U u) {
@@ -53,7 +69,7 @@ public abstract class RecommendationVerticesFactory<U, I, M> {
     }
 
     public void addEdge(U u, I i) {
-        ebro.addEdge(users.get(u), items.get(i));
+        ebro.addEdge(users.getInt(u), items.getInt(i));
     }
 
     public Set<U> getUsers() {
@@ -64,12 +80,14 @@ public abstract class RecommendationVerticesFactory<U, I, M> {
         return items.keySet();
     }
 
+    @SuppressWarnings("unchecked")
     public UserVertex<U, M> getUserVertex(U u) {
-        return (UserVertex<U, M>) ebro.getVertex(users.get(u));
+        return (UserVertex<U, M>) ebro.getVertex(users.getInt(u));
     }
 
+    @SuppressWarnings("unchecked")
     public ItemVertex<I, M> getItemVertex(I i) {
-        return (ItemVertex<I, M>) ebro.getVertex(items.get(i));
+        return (ItemVertex<I, M>) ebro.getVertex(items.getInt(i));
     }
 
     public abstract UserVertex<U, M> createUserVertex(U u);
@@ -101,36 +119,46 @@ public abstract class RecommendationVerticesFactory<U, I, M> {
         }
 
         public void sendMessageToAllItems(M message) {
-            for (int i_id : items.values()) {
-                sendMessage(i_id, message);
-            }
+            items.values().forEach(i_id -> sendMessage(i_id, message));
         }
 
-        protected void printResults(TIntDoubleMap scoresMap) {
+        @SuppressWarnings("unchecked")
+        protected void printResults(Int2DoubleMap scoresMap) {
             for (int i = 0; i < edgeDestList.size(); i++) {
-                int i_id = edgeDestList.getQuick(i);
+                int i_id = edgeDestList.getInt(i);
                 scoresMap.remove(i_id);
             }
 
-            final TIntDoubleTopN topN = new TIntDoubleTopN(cutoff);
-            scoresMap.forEachEntry((a, b) -> {
-                topN.add(a, b);
-                return true;
-            });
-            scoresMap.clear();
+            Comparator<Entry> cmp = (e1, e2) -> {
+                int c = Double.compare(e1.getDoubleValue(), e2.getDoubleValue());
+                if (c != 0) {
+                    return c;
+                } else {
+                    c = Integer.compare(e1.getIntKey(), e2.getIntKey());
+                    return c;
+                }
+            };
+            TopN<Entry> topN = new TopN<>(cutoff, cmp);
+            scoresMap.int2DoubleEntrySet().forEach(topN::add);
 
             topN.sort();
 
             synchronized (writer) {
                 try {
-                    for (int i = topN.size() - 1; i >= 0; i--) {
-                        String i_id = ((ItemVertex<String, Object[]>) ebro.getVertex(topN.getKeyAt(i))).i_ml;
-                        writer.write(u_ml + "\t" + i_id + "\t" + topN.getValueAt(i));
-                        writer.newLine();
-                    }
+                    topN.reverseStream().forEach(e -> {
+                        int i = e.getIntKey();
+                        double v = e.getDoubleValue();
+                        String i_id = ((ItemVertex<String, M>) ebro.getVertex(i)).i_ml;
+                        try {
+                            writer.write(u_ml + "\t" + i_id + "\t" + v);
+                            writer.newLine();
+                        } catch (IOException ex) {
+                            throw new UncheckedIOException(ex);
+                        }
+                    });
                     writer.flush();
                 } catch (IOException ex) {
-                    Logger.getLogger(ItemBasedKNNRVF.class.getName()).log(Level.SEVERE, null, ex);
+                    throw new UncheckedIOException(ex);
                 }
             }
 

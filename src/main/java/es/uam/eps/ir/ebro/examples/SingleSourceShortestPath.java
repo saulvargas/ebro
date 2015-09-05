@@ -1,13 +1,33 @@
+/* 
+ * Copyright (C) 2015 Saúl Vargas (saul@vargassandoval.es)
+ *
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
+ */
 package es.uam.eps.ir.ebro.examples;
 
 import es.uam.eps.ir.ebro.Ebro;
 import es.uam.eps.ir.ebro.Ebro.Vertex;
-import gnu.trove.impl.Constants;
-import gnu.trove.set.TIntSet;
-import gnu.trove.set.hash.TIntHashSet;
+import it.unimi.dsi.fastutil.ints.IntOpenHashSet;
+import it.unimi.dsi.fastutil.ints.IntSet;
 import java.util.Collection;
 import java.util.Random;
 
+/**
+ * Example: single-source shortest path algorithm.
+ *
+ * @author Saúl Vargas (saul@vargassandoval.es)
+ */
 public class SingleSourceShortestPath {
 
     public static void main(String[] args) {
@@ -15,7 +35,7 @@ public class SingleSourceShortestPath {
         int N = 500000;
         double p = 0.0001;
 
-        Ebro ebro = new Ebro(6, N, true, true);
+        Ebro<Double> ebro = new Ebro<>(N, true, true);
 
         for (int i = 0; i < N; i++) {
             ebro.addVertex(new SSSPVertex(0, Double.POSITIVE_INFINITY));
@@ -24,9 +44,9 @@ public class SingleSourceShortestPath {
         Random rnd = new Random(123456L);
         int S = (int) ((p * N) * (N - 1));
 
-        TIntSet[] edges = new TIntSet[N];
+        IntSet[] edges = new IntSet[N];
         for (int i = 0; i < N; i++) {
-            edges[i] = new TIntHashSet(Constants.DEFAULT_CAPACITY, Constants.DEFAULT_LOAD_FACTOR, -1);
+            edges[i] = new IntOpenHashSet();
         }
 
         for (int s = 0; s < S; s++) {
@@ -77,7 +97,7 @@ public class SingleSourceShortestPath {
             if (minDist < dist) {
                 dist = minDist;
                 for (int i = 0; i < edgeDestList.size(); i++) {
-                    sendMessage(edgeDestList.getQuick(i), dist + edgeWeightList.getQuick(i));
+                    sendMessage(edgeDestList.getInt(i), dist + edgeWeightList.getDouble(i));
                 }
             }
             voteToHalt();

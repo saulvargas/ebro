@@ -1,7 +1,18 @@
-/*
- * To change this license header, choose License Headers in Project Properties.
- * To change this template file, choose Tools | Templates
- * and open the template in the editor.
+/* 
+ * Copyright (C) 2015 Saúl Vargas (saul@vargassandoval.es)
+ *
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 package es.uam.eps.ir.ebro.examples;
 
@@ -21,24 +32,25 @@ import java.util.Map;
 import java.util.function.BiFunction;
 
 /**
+ * Example: collaborative filtering algorithms.
  *
- * @author saul
+ * @author Saúl Vargas (saul@vargassandoval.es)
  */
 public class Recommendations {
 
+    @SuppressWarnings("unchecked")
     public static void main(String[] args) throws Exception {
-        String fileIn = null;
-        String dirOut = null;
-        int nthreads = 6;
+        String fileIn = "total.data";
+        String dirOut = "recsys/";
 
-        Map<String, BiFunction<Ebro, BufferedWriter, RecommendationVerticesFactory<String, String, Object[]>>> rvfMap = new HashMap<>();
+        Map<String, BiFunction<Ebro<Object[]>, BufferedWriter, RecommendationVerticesFactory<String, String, Object[]>>> rvfMap = new HashMap<>();
 
         rvfMap.put("ib", (ebro, writer) -> new ItemBasedKNNRVF<>(ebro, writer, 100, 50));
-        rvfMap.put("plsa", (ebro, writer) -> new PLSARVF<>(ebro, 50, 200, 100, writer));
+        rvfMap.put("plsa", (ebro, writer) -> new PLSARVF<>(ebro, 50, 20, 100, writer));
 
         rvfMap.forEach((name, supplier) -> {
             try (BufferedWriter writer = new BufferedWriter(new FileWriter(dirOut + name))) {
-                final Ebro ebro = new Ebro(nthreads, 5000, false, false);
+                final Ebro ebro = new Ebro(5000, false, false);
 
                 RecommendationVerticesFactory<String, String, Object[]> rvf = supplier.apply(ebro, writer);
                 

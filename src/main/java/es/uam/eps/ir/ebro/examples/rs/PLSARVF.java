@@ -1,24 +1,35 @@
-/*
- * To change this license header, choose License Headers in Project Properties.
- * To change this template file, choose Tools | Templates
- * and open the template in the editor.
+/* 
+ * Copyright (C) 2015 Saúl Vargas (saul@vargassandoval.es)
+ *
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 package es.uam.eps.ir.ebro.examples.rs;
 
 import es.uam.eps.ir.ebro.Ebro;
 import es.uam.eps.ir.ebro.Ebro.Aggregator;
-import gnu.trove.impl.Constants;
-import gnu.trove.map.TIntDoubleMap;
-import gnu.trove.map.TIntObjectMap;
-import gnu.trove.map.hash.TIntDoubleHashMap;
-import gnu.trove.map.hash.TIntObjectHashMap;
+import it.unimi.dsi.fastutil.ints.Int2DoubleMap;
+import it.unimi.dsi.fastutil.ints.Int2DoubleOpenHashMap;
+import it.unimi.dsi.fastutil.ints.Int2ObjectMap;
+import it.unimi.dsi.fastutil.ints.Int2ObjectOpenHashMap;
 import java.io.BufferedWriter;
 import java.util.Collection;
 import java.util.Random;
 
 /**
+ * Vertices factory for the pLSA recommendation algorithm.
  *
- * @author saul
+ * @author Saúl Vargas (saul@vargassandoval.es)
  */
 public class PLSARVF<U, I> extends RecommendationVerticesFactory<U, I, Object[]> {
 
@@ -34,7 +45,7 @@ public class PLSARVF<U, I> extends RecommendationVerticesFactory<U, I, Object[]>
         ITEM_REC_RESPONSE
     }
 
-    public PLSARVF(Ebro ebro, int K, int numIter, int cutoff, BufferedWriter writer) {
+    public PLSARVF(Ebro<Object[]> ebro, int K, int numIter, int cutoff, BufferedWriter writer) {
         super(ebro, cutoff, writer);
         this.K = K;
         this.numIter = numIter;
@@ -48,7 +59,7 @@ public class PLSARVF<U, I> extends RecommendationVerticesFactory<U, I, Object[]>
         return new UserVertex<U, Object[]>(u) {
 
             private final double[] pU_z = initVector(K);
-            private TIntObjectMap<double[]> qz_Ui = null;
+            private Int2ObjectMap<double[]> qz_Ui = null;
             private boolean waiting = false;
 
             @Override
@@ -56,9 +67,9 @@ public class PLSARVF<U, I> extends RecommendationVerticesFactory<U, I, Object[]>
                 if (superstep() < 2 * numIter) {
                     if (superstep() == 0) {
 
-                        qz_Ui = new TIntObjectHashMap<>();
+                        qz_Ui = new Int2ObjectOpenHashMap<>();
                         for (int i = 0; i < edgeDestList.size(); i++) {
-                            qz_Ui.put(edgeDestList.getQuick(i), new double[K]);
+                            qz_Ui.put(edgeDestList.getInt(i), new double[K]);
                         }
 
                     } else if (superstep() % 2 == 0) {
@@ -67,7 +78,7 @@ public class PLSARVF<U, I> extends RecommendationVerticesFactory<U, I, Object[]>
                         for (int z = 0; z < K; z++) {
                             pU_z[z] = 0;
                         }
-                        qz_Ui.valueCollection().stream().forEach(qz_UI -> {
+                        qz_Ui.values().forEach(qz_UI -> {
                             for (int z = 0; z < K; z++) {
                                 pU_z[z] += qz_UI[z];
                             }
@@ -100,7 +111,7 @@ public class PLSARVF<U, I> extends RecommendationVerticesFactory<U, I, Object[]>
                         });
 
                         double[] normZU = new double[K];
-                        qz_Ui.valueCollection().stream().forEach(qz_UI -> {
+                        qz_Ui.values().forEach(qz_UI -> {
                             for (int z = 0; z < K; z++) {
                                 normZU[z] += qz_UI[z];
                             }
@@ -108,7 +119,7 @@ public class PLSARVF<U, I> extends RecommendationVerticesFactory<U, I, Object[]>
                         normZAggr.aggregate(normZU);
 
                         for (int i = 0; i < edgeDestList.size(); i++) {
-                            int i_id = edgeDestList.getQuick(i);
+                            int i_id = edgeDestList.getInt(i);
                             sendMessage(i_id, new Object[]{MessageType.USER_MAXIMIZATION, qz_Ui.get(i_id)});
                         }
 
@@ -121,7 +132,7 @@ public class PLSARVF<U, I> extends RecommendationVerticesFactory<U, I, Object[]>
                         waiting = true;
                     }
 
-                    TIntDoubleMap scoresMap = new TIntDoubleHashMap(Constants.DEFAULT_CAPACITY, Constants.DEFAULT_LOAD_FACTOR, -1, 0.0);
+                    Int2DoubleMap scoresMap = new Int2DoubleOpenHashMap();
                     messages.forEach(m -> {
                         switch ((MessageType) m[0]) {
                             case ITEM_REC_RESPONSE:
@@ -185,7 +196,7 @@ public class PLSARVF<U, I> extends RecommendationVerticesFactory<U, I, Object[]>
                         });
 
                         for (int i = 0; i < edgeDestList.size(); i++) {
-                            int u_id = edgeDestList.getQuick(i);
+                            int u_id = edgeDestList.getInt(i);
                             sendMessage(u_id, new Object[]{MessageType.ITEM_EXPECTATION, id, pIz});
                         }
                     }
