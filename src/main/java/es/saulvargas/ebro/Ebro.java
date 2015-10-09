@@ -32,7 +32,7 @@ import java.util.List;
  * The Pregel-like engine of the system.
  *
  * @author Saúl Vargas (saul@vargassandoval.es)
- * @param <M>
+ * @param <M> message type
  */
 public class Ebro<M> {
 

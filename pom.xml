@@ -58,8 +58,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <artifactId>maven-compiler-plugin</artifactId>
                 <version>3.2</version>
                 <configuration>
-                    <source>${maven.compiler.source}</source>
-                    <target>${maven.compiler.target}</target>
+                    <source>1.8</source>
+                    <target>1.8</target>
                     <compilerArgument>-Xlint</compilerArgument>
                 </configuration>
             </plugin>
