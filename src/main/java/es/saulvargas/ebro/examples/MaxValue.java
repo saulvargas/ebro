@@ -14,10 +14,10 @@
  * You should have received a copy of the GNU General Public License
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
-package es.uam.eps.ir.ebro.examples;
+package es.saulvargas.ebro.examples;
 
-import es.uam.eps.ir.ebro.Ebro;
-import es.uam.eps.ir.ebro.Ebro.Vertex;
+import es.saulvargas.ebro.Ebro;
+import es.saulvargas.ebro.Ebro.Vertex;
 import it.unimi.dsi.fastutil.doubles.DoubleOpenHashSet;
 import it.unimi.dsi.fastutil.doubles.DoubleSet;
 import it.unimi.dsi.fastutil.ints.IntOpenHashSet;

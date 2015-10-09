@@ -19,7 +19,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
          xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
     <modelVersion>4.0.0</modelVersion>
 
-    <groupId>com.github.saulvargas.ebro</groupId>
+    <groupId>es.saulvargas</groupId>
     <artifactId>ebro</artifactId>
     <version>0.1</version>
     <packaging>jar</packaging>

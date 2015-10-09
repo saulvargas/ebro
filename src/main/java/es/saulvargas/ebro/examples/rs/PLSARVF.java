@@ -14,10 +14,10 @@
  * You should have received a copy of the GNU General Public License
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
-package es.uam.eps.ir.ebro.examples.rs;
+package es.saulvargas.ebro.examples.rs;
 
-import es.uam.eps.ir.ebro.Ebro;
-import es.uam.eps.ir.ebro.Ebro.Aggregator;
+import es.saulvargas.ebro.Ebro;
+import es.saulvargas.ebro.Ebro.Aggregator;
 import it.unimi.dsi.fastutil.ints.Int2DoubleMap;
 import it.unimi.dsi.fastutil.ints.Int2DoubleOpenHashMap;
 import it.unimi.dsi.fastutil.ints.Int2ObjectMap;

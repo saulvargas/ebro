@@ -14,13 +14,13 @@
  * You should have received a copy of the GNU General Public License
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
-package es.uam.eps.ir.ebro.examples;
+package es.saulvargas.ebro.examples;
 
-import es.uam.eps.ir.ebro.Ebro;
-import es.uam.eps.ir.ebro.examples.rs.PLSARVF;
-import es.uam.eps.ir.ebro.examples.rs.ItemBasedKNNRVF;
-import es.uam.eps.ir.ebro.examples.rs.RecommendationVerticesFactory;
-import es.uam.eps.ir.ebro.examples.rs.RecommendationVerticesFactory.UserVertex;
+import es.saulvargas.ebro.Ebro;
+import es.saulvargas.ebro.examples.rs.PLSARVF;
+import es.saulvargas.ebro.examples.rs.ItemBasedKNNRVF;
+import es.saulvargas.ebro.examples.rs.RecommendationVerticesFactory;
+import es.saulvargas.ebro.examples.rs.RecommendationVerticesFactory.UserVertex;
 import java.io.BufferedReader;
 import java.io.BufferedWriter;
 import java.io.FileReader;
