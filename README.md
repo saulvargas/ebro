@@ -1,7 +1,7 @@
 # ebro
 Small, simple Pregel-like computation for graph algorithms.
 
-Maven instruction:s
+Maven instructions:
 
 ~~~
 	<repository>
